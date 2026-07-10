@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus, Trash2 } from 'lucide-react';
 import { Markdown } from './Markdown';
 
 interface Message {
@@ -65,6 +65,11 @@ export const Chat: React.FC = () => {
     
     if (!/^https?:\/\//i.test(targetUrl)) {
       targetUrl = "https://" + targetUrl;
+    }
+    
+    if (localConcepts.some(c => c.title.toLowerCase() === targetUrl.toLowerCase())) {
+      setUrlError("URL is already in memory.");
+      return;
     }
     
     setUrlError(null);
@@ -240,6 +245,12 @@ export const Chat: React.FC = () => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 setUploadError(null);
+                
+                if (localConcepts.some(c => c.title === file.name)) {
+                  setUploadError("File is already in memory.");
+                  return;
+                }
+                
                 setIsThinking(true);
                 
                 const formData = new FormData();
@@ -339,20 +350,35 @@ export const Chat: React.FC = () => {
               ) : (
                 <div className="space-y-1.5">
                   {localConcepts.map((concept) => (
-                    <button
+                    <div
                       key={concept.id}
-                      type="button"
-                      onClick={() => {
-                        setInput(concept.id);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 hover:border-emerald-500/25 transition-all flex items-start gap-2.5 group cursor-pointer"
+                      className="w-full flex items-center justify-between gap-1.5 p-1 rounded-xl bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/25 group hover:bg-emerald-500/10 transition-all select-none"
                     >
-                      <FileText className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
-                        <p className="text-[9px] text-emerald-500/70 truncate m-0 font-mono">{concept.id}</p>
-                      </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInput(concept.id);
+                        }}
+                        className="flex-1 text-left px-2 py-1 flex items-start gap-2.5 min-w-0 bg-transparent border-0 cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
+                          <p className="text-[9px] text-emerald-500/70 truncate m-0 font-mono">{concept.id}</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocalConcepts(prev => prev.filter(c => c.id !== concept.id));
+                        }}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border-0 mr-1 shrink-0"
+                        title="Remove from session memory"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
