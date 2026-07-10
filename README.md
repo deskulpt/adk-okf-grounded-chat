@@ -27,6 +27,10 @@ Traditional Retrieval-Augmented Generation (RAG) models index documents as flat,
 *   **Client-Side Ingestion Sandbox**: Drag-and-drop complex document types (PDFs, images, audios, Pages, Numbers, Keynote) or paste URLs. The backend compiles them into OKF-compliant Markdown files on the fly.
 *   **Offline Sentence Synthesis**: A toggled "Pure OKF Mode" completely bypasses LLMs, executing a local, rule-based search, extractive sentence synthesis, and potential follow-up suggestions 100% privately.
 
+
+<img width="1152" height="818" alt="Screenshot 2026-07-10 at 6 34 59 PM" src="https://github.com/user-attachments/assets/8523bd90-1b30-49d3-8c30-8bad9274a3bd" />
+
+
 ---
 
 ## 🆚 Comparative Analysis
