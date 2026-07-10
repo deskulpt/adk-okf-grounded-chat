@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X } from 'lucide-react';
 import { Markdown } from './Markdown';
 
 interface Message {
@@ -19,9 +19,17 @@ export const Chat: React.FC = () => {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [useAI, setUseAI] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
+  const [activeTab, setActiveTab] = useState<'key' | 'guide'>('key');
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleSaveKey = (val: string) => {
+    setApiKey(val);
+    localStorage.setItem('openrouter_api_key', val);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,6 +62,7 @@ export const Chat: React.FC = () => {
             content: m.content,
           })),
           use_ai: useAI,
+          api_key: apiKey || undefined,
         }),
       });
 
@@ -160,6 +169,13 @@ export const Chat: React.FC = () => {
             </button>
           </div>
           <button 
+            onClick={() => setShowSettings(true)}
+            className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
+            title="OpenRouter Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          <button 
             onClick={() => setMessages([{ role: 'assistant', content: 'Hello! Message log cleared. Ask me anything!' }])}
             className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
             title="Clear Conversation"
@@ -264,6 +280,114 @@ export const Chat: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300">
+          <div className="glassmorphism rounded-2xl w-full max-w-lg shadow-2xl border border-white/10 flex flex-col relative overflow-hidden text-left">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/[0.01]">
+              <div className="flex items-center gap-2.5">
+                <Settings className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-semibold text-white tracking-tight font-heading m-0">OpenRouter Settings</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all cursor-pointer border-0 outline-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-white/5 text-sm">
+              <button
+                type="button"
+                onClick={() => setActiveTab('key')}
+                className={`flex-1 py-3 text-center border-b-2 font-medium transition-colors cursor-pointer border-0 outline-none bg-transparent ${
+                  activeTab === 'key'
+                    ? 'border-indigo-500 text-indigo-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                API Credentials
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('guide')}
+                className={`flex-1 py-3 text-center border-b-2 font-medium transition-colors cursor-pointer border-0 outline-none bg-transparent ${
+                  activeTab === 'guide'
+                    ? 'border-indigo-500 text-indigo-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Free Preset Guide
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 max-h-[350px] overflow-y-auto space-y-4">
+              {activeTab === 'key' ? (
+                <div className="space-y-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold tracking-wide text-gray-400 uppercase">OpenRouter API Key</label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => handleSaveKey(e.target.value)}
+                      placeholder="REMOVED_KEY"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/10 focus:border-indigo-500/50 outline-none text-white text-sm transition-all shadow-inner"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Your key is saved locally in your browser's <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">localStorage</code> and never sent to any server except directly to the local backend runner for LLM fallbacks. Leave empty to use the system default key.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3.5 text-sm text-gray-300 leading-relaxed">
+                  <h4 className="text-white font-semibold m-0 text-sm">How to Configure Free Presets on OpenRouter:</h4>
+                  
+                  <div className="space-y-2 pl-1">
+                    <div className="flex gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">1</span>
+                      <p className="m-0 text-xs">Navigate to <strong>OpenRouter.ai</strong>, log in, and head to the <strong>Keys</strong> tab under your dashboard.</p>
+                    </div>
+
+                    <div className="flex gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">2</span>
+                      <p className="m-0 text-xs">Generate a new API key. You can set credit limits to ensure zero unexpected charges.</p>
+                    </div>
+
+                    <div className="flex gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">3</span>
+                      <p className="m-0 text-xs">When configuring presets or requests, OpenRouter supports routing suffixes. You can append <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">:free</code> to any free tier model identifier (e.g. <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">tencent/hy3:free</code> or <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">google/gemini-2.5-flash:free</code>).</p>
+                    </div>
+
+                    <div className="flex gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">4</span>
+                      <p className="m-0 text-xs">This ensures the LLM fallback strictly utilizes zero-cost endpoints, preventing unexpected billing.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-white/5 bg-white/[0.01] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-medium text-xs md:text-sm shadow-md hover:shadow-indigo-500/25 transition-all cursor-pointer border-0 outline-none"
+              >
+                Done
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

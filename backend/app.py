@@ -57,6 +57,7 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
     use_ai = data.get("use_ai", True)
+    api_key = data.get("api_key")
     if not messages:
         return {"error": "No messages provided"}
     
@@ -88,6 +89,13 @@ async def chat_endpoint(request: Request):
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
         else:
             # Fallback to ADK agent loop using OpenRouter
+            import litellm
+            if api_key:
+                print("Using custom OpenRouter API Key provided in request payload.")
+                litellm.api_key = api_key
+            else:
+                litellm.api_key = shared.OPENROUTER_KEY
+                
             print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}'")
             session = await session_service.create_session(
                 app_name="okf_agent_app",
