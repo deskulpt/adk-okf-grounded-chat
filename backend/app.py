@@ -110,3 +110,12 @@ async def chat_endpoint(request: Request):
                 yield f"data: {json.dumps({'text': f'Error: Failed to fetch response from OpenRouter: {e}', 'okf_match': False})}\n\n"
                 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Mount React built assets
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(dist_dir):
+    app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")
+
