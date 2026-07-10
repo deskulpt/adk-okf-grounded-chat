@@ -12,9 +12,9 @@ trap cleanup SIGINT SIGTERM EXIT
 echo "Starting ADK OKF Agent UI..."
 
 # Start FastAPI backend
-echo "Starting Backend Server on port 8000..."
+echo "Starting Backend Server on port 8040..."
 cd backend
-.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --reload &
+.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8040 --reload &
 BACKEND_PID=$!
 cd ..
 
