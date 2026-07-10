@@ -1,5 +1,6 @@
 import json
 import asyncio
+import os
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,7 +74,6 @@ def get_concepts():
 
 
 import tempfile
-import os
 import re
 from markitdown import MarkItDown
 
@@ -91,7 +91,6 @@ async def convert_file(file: UploadFile = File(...), api_key: str = Form(None)):
         if suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.gif'] and api_key:
             import base64
             import litellm
-            import os
             try:
                 base64_image = base64.b64encode(content).decode('utf-8')
                 mime_type = file.content_type or "image/jpeg"
@@ -117,7 +116,6 @@ async def convert_file(file: UploadFile = File(...), api_key: str = Form(None)):
         elif suffix.lower() in ['.mp3', '.wav', '.ogg', '.flac'] and api_key:
             import base64
             import litellm
-            import os
             try:
                 base64_audio = base64.b64encode(content).decode('utf-8')
                 mime_type = file.content_type or "audio/mp3"
@@ -303,7 +301,6 @@ async def chat_endpoint(request: Request):
         else:
             # Fallback to ADK agent loop
             import litellm
-            import os
             if api_key:
                 if api_key.startswith("AIzaSy"):
                     print("Using Google AI Studio API Key. Routing directly to Gemini 2.5 Flash.")
@@ -346,7 +343,6 @@ async def chat_endpoint(request: Request):
                 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
-import os
 from fastapi.staticfiles import StaticFiles
 
 # Mount React built assets
