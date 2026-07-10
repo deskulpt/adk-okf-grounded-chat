@@ -282,64 +282,69 @@ async def chat_endpoint(request: Request):
 
     
     async def sse_generator():
-        if matched_concept:
-            # Local OKF match found! Stream it.
+        is_grounded = matched_concept is not None
+        
+        if is_grounded:
             print(f"OKF Match Found: {matched_concept['title']}")
-            # Yield metadata block
             yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
             
-            # Stream the content with simulated chunking
-            content = matched_concept["content"]
-            chunk_size = 40
-            for i in range(0, len(content), chunk_size):
-                chunk = content[i:i+chunk_size]
-                yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
-                await asyncio.sleep(0.01)
-        elif not use_ai:
+        if not use_ai and not is_grounded:
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
+            return
+
+        base_instruction = "You are a helpful grounding assistant. Provide detailed and accurate responses."
+        if is_grounded:
+            agent.instruction = f"""{base_instruction}
+You are grounded by the following local OKF context. Answer the user's question concisely based ONLY on this context. Do not make up facts outside the context.
+If the user is simply asking to show, display, or read the document, you can show the relevant parts or the entire document.
+
+[GROUNDING CONTEXT]:
+{matched_concept['content']}
+"""
         else:
-            # Fallback to ADK agent loop
-            import litellm
-            if api_key:
-                if api_key.startswith("AIzaSy"):
-                    print("Using Google AI Studio API Key. Routing directly to Gemini 2.5 Flash.")
-                    agent.model = "gemini/gemini-2.5-flash"
-                    os.environ["GEMINI_API_KEY"] = api_key
-                    litellm.api_key = api_key
-                else:
-                    print("Using custom OpenRouter API Key.")
-                    agent.model = "openrouter/google/gemini-2.5-flash"
-                    litellm.api_key = api_key
+            agent.instruction = base_instruction
+
+        import litellm
+        if api_key:
+            if api_key.startswith("AIzaSy"):
+                print("Using Google AI Studio API Key.")
+                agent.model = "gemini/gemini-2.5-flash"
+                os.environ["GEMINI_API_KEY"] = api_key
+                litellm.api_key = api_key
             else:
-                print("Using default OpenRouter free preset.")
-                agent.model = shared.DEFAULT_MODEL
-                litellm.api_key = shared.OPENROUTER_KEY
-                
-            print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}' using model '{agent.model}'")
-            session = await session_service.create_session(
-                app_name="okf_agent_app",
-                user_id="user_1"
-            )
-            content_msg = types.Content(
-                role="user",
-                parts=[types.Part(text=user_query)]
-            )
+                print("Using custom OpenRouter API Key.")
+                agent.model = "openrouter/google/gemini-2.5-flash"
+                litellm.api_key = api_key
+        else:
+            print("Using default OpenRouter free preset.")
+            agent.model = shared.DEFAULT_MODEL
+            litellm.api_key = shared.OPENROUTER_KEY
             
-            try:
-                async for event in runner.run_async(
-                    user_id=session.user_id,
-                    session_id=session.id,
-                    new_message=content_msg
-                ):
-                    if event.content and event.content.parts:
-                        text_chunks = [p.text for p in event.content.parts if p.text]
-                        if text_chunks:
-                            joined_text = "".join(text_chunks)
-                            yield f"data: {json.dumps({'text': joined_text, 'okf_match': False})}\n\n"
-            except Exception as e:
-                print(f"Error calling ADK Agent: {e}")
-                yield f"data: {json.dumps({'text': f'Error: Failed to fetch response from OpenRouter: {e}', 'okf_match': False})}\n\n"
+        print(f"Routing to LLM for query: '{user_query}' using model '{agent.model}' (Grounded: {is_grounded})")
+        session = await session_service.create_session(
+            app_name="okf_agent_app",
+            user_id="user_1"
+        )
+        content_msg = types.Content(
+            role="user",
+            parts=[types.Part(text=user_query)]
+        )
+        
+        try:
+            async for event in runner.run_async(
+                user_id=session.user_id,
+                session_id=session.id,
+                new_message=content_msg
+            ):
+                if event.content and event.content.parts:
+                    text_chunks = [p.text for p in event.content.parts if p.text]
+                    if text_chunks:
+                        joined_text = "".join(text_chunks)
+                        yield f"data: {json.dumps({'text': joined_text, 'okf_match': is_grounded, 'concept': matched_concept['title'] if is_grounded else None})}\n\n"
+        except Exception as e:
+            print(f"Error calling ADK Agent: {e}")
+            yield f"data: {json.dumps({'text': f'Error: Failed to fetch response: {e}', 'okf_match': is_grounded})}\n\n"
                 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
