@@ -31,7 +31,10 @@ export const Chat: React.FC = () => {
   const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
-  const [activeTab, setActiveTab] = useState<'key' | 'guide'>('key');
+  const [activeTab, setActiveTab] = useState<'key' | 'profile' | 'guide'>('key');
+  const [agentName, setAgentName] = useState(() => localStorage.getItem('agent_name') || 'Antigravity Grounding Core');
+  const [agentTone, setAgentTone] = useState(() => localStorage.getItem('agent_tone') || 'Helpful, warm, concise, professional');
+  const [agentBehaviors, setAgentBehaviors] = useState(() => localStorage.getItem('agent_behaviors') || 'Speak with structured lists. Cite documents clearly. Avoid CoT leakage.');
   const [error, setError] = useState<string | null>(null);
 
   const [localConcepts, setLocalConcepts] = useState<Concept[]>([]);
@@ -46,6 +49,18 @@ export const Chat: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('pure_okf', pureOkf.toString());
   }, [pureOkf]);
+
+  useEffect(() => {
+    localStorage.setItem('agent_name', agentName);
+  }, [agentName]);
+
+  useEffect(() => {
+    localStorage.setItem('agent_tone', agentTone);
+  }, [agentTone]);
+
+  useEffect(() => {
+    localStorage.setItem('agent_behaviors', agentBehaviors);
+  }, [agentBehaviors]);
 
   const handleSaveKey = (val: string) => {
     setApiKey(val);
@@ -131,6 +146,9 @@ export const Chat: React.FC = () => {
           use_ai: useAI,
           pure_okf: pureOkf,
           api_key: apiKey || undefined,
+          agent_name: agentName,
+          agent_tone: agentTone,
+          agent_behaviors: agentBehaviors,
           local_concepts: localConcepts,
         }),
       });
@@ -582,7 +600,7 @@ export const Chat: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-white/5 text-sm">
+            <div className="flex border-b border-white/5 text-sm shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('key')}
@@ -596,6 +614,17 @@ export const Chat: React.FC = () => {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('profile')}
+                className={`flex-1 py-3 text-center border-b-2 font-medium transition-colors cursor-pointer border-0 outline-none bg-transparent ${
+                  activeTab === 'profile'
+                    ? 'border-indigo-500 text-indigo-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Agent Profile
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('guide')}
                 className={`flex-1 py-3 text-center border-b-2 font-medium transition-colors cursor-pointer border-0 outline-none bg-transparent ${
                   activeTab === 'guide'
@@ -603,13 +632,13 @@ export const Chat: React.FC = () => {
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
               >
-                Free Preset Guide
+                Preset Guide
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 max-h-[350px] overflow-y-auto space-y-4">
-              {activeTab === 'key' ? (
+            <div className="p-6 max-h-[420px] overflow-y-auto space-y-4">
+              {activeTab === 'key' && (
                 <div className="space-y-3.5">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold tracking-wide text-gray-400 uppercase">OpenRouter API Key</label>
@@ -625,7 +654,60 @@ export const Chat: React.FC = () => {
                     Your key is saved locally in your browser's <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">localStorage</code> and never sent to any server except directly to the local backend runner for LLM fallbacks. Leave empty to use the system default key.
                   </p>
                 </div>
-              ) : (
+              )}
+
+              {activeTab === 'profile' && (
+                <div className="space-y-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold tracking-wide text-gray-400 uppercase">Agent Name</label>
+                    <input
+                      type="text"
+                      value={agentName}
+                      onChange={(e) => setAgentName(e.target.value)}
+                      placeholder="Antigravity Grounding Core"
+                      className="w-full px-4 py-2 rounded-xl bg-white/[0.02] border border-white/10 focus:border-indigo-500/50 outline-none text-white text-xs transition-all shadow-inner"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold tracking-wide text-gray-400 uppercase">Personality & Tone</label>
+                    <textarea
+                      value={agentTone}
+                      onChange={(e) => setAgentTone(e.target.value)}
+                      placeholder="Helpful, warm, concise, professional..."
+                      rows={2}
+                      className="w-full px-4 py-2 rounded-xl bg-white/[0.02] border border-white/10 focus:border-indigo-500/50 outline-none text-white text-xs transition-all shadow-inner resize-none font-sans"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold tracking-wide text-gray-400 uppercase">Behavioral Instructions</label>
+                    <textarea
+                      value={agentBehaviors}
+                      onChange={(e) => setAgentBehaviors(e.target.value)}
+                      placeholder="Cites documents, structures responses..."
+                      rows={3}
+                      className="w-full px-4 py-2 rounded-xl bg-white/[0.02] border border-white/10 focus:border-indigo-500/50 outline-none text-white text-xs transition-all shadow-inner resize-none font-sans"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
+                    <p className="text-[9px] text-gray-500 italic max-w-[70%] leading-relaxed m-0 text-left">
+                      These settings define the background persona. They shape the agent's behavior but are never returned as files or verbatim text.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAgentName('Antigravity Grounding Core');
+                        setAgentTone('Helpful, warm, concise, professional');
+                        setAgentBehaviors('Speak with structured lists. Cite documents clearly. Avoid CoT leakage.');
+                      }}
+                      className="text-[9px] text-indigo-400 hover:text-indigo-300 underline font-semibold cursor-pointer bg-transparent border-0 p-0 outline-none"
+                    >
+                      Reset Defaults
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'guide' && (
                 <div className="space-y-3.5 text-sm text-gray-300 leading-relaxed">
                   <h4 className="text-white font-semibold m-0 text-sm">How to Configure Free Presets on OpenRouter:</h4>
                   
@@ -634,17 +716,17 @@ export const Chat: React.FC = () => {
                       <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">1</span>
                       <p className="m-0 text-xs">Navigate to <strong>OpenRouter.ai</strong>, log in, and head to the <strong>Keys</strong> tab under your dashboard.</p>
                     </div>
-
+ 
                     <div className="flex gap-2.5">
                       <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">2</span>
                       <p className="m-0 text-xs">Generate a new API key. You can set credit limits to ensure zero unexpected charges.</p>
                     </div>
-
+ 
                     <div className="flex gap-2.5">
                       <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">3</span>
                       <p className="m-0 text-xs">When configuring presets or requests, OpenRouter supports routing suffixes. You can append <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">:free</code> to any free tier model identifier (e.g. <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">tencent/hy3:free</code> or <code className="bg-white/10 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">google/gemini-2.5-flash:free</code>).</p>
                     </div>
-
+ 
                     <div className="flex gap-2.5">
                       <span className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-mono text-xs text-indigo-400 shrink-0 mt-0.5">4</span>
                       <p className="m-0 text-xs">This ensures the LLM fallback strictly utilizes zero-cost endpoints, preventing unexpected billing.</p>

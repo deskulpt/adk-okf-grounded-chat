@@ -60,6 +60,8 @@ def get_concepts():
     # Strip full file path for client privacy before sending
     safe_concepts = []
     for c in okf_engine.concepts:
+        if c.get("type") in ("persona", "instruction"):
+            continue
         safe_concepts.append({
             "id": c["id"],
             "type": c["type"],
@@ -249,18 +251,12 @@ description: "Converted URL webpage: {url}"
         return {"error": f"Failed to convert URL: {str(e)}"}
 
 
-def get_base_persona_instructions():
-    persona_blocks = []
-    for c in okf_engine.concepts:
-        if c.get("type") in ("persona", "instruction"):
-            persona_blocks.append(c['content'])
-    
-    persona_content = "\n\n".join(persona_blocks) if persona_blocks else ""
-    
-    return f"""You are Antigravity Grounding Core, a highly intelligent cognitive assistant.
+def get_base_persona_instructions(name: str, tone: str, behaviors: str):
+    return f"""You are {name}, a highly intelligent cognitive assistant.
 
 [CONVERSATIONAL PERSONA & STYLE]:
-{persona_content}
+- Tone: {tone}
+- Behavioral Instructions: {behaviors}
 
 [CRITICAL INSTRUCTION]:
 - Output ONLY the final direct response to the user.
@@ -276,6 +272,9 @@ async def chat_endpoint(request: Request):
     use_ai = data.get("use_ai", True)
     pure_okf = data.get("pure_okf", False)
     api_key = data.get("api_key")
+    agent_name = data.get("agent_name", "Antigravity Grounding Core")
+    agent_tone = data.get("agent_tone", "Helpful, warm, concise, professional")
+    agent_behaviors = data.get("agent_behaviors", "Speak with structured lists. Cite documents clearly. Avoid CoT leakage.")
     local_concepts = data.get("local_concepts", [])
     if not messages:
         return {"error": "No messages provided"}
@@ -345,7 +344,7 @@ async def chat_endpoint(request: Request):
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
             return
 
-        base_instruction = get_base_persona_instructions()
+        base_instruction = get_base_persona_instructions(agent_name, agent_tone, agent_behaviors)
         if is_grounded:
             non_persona_matches = [c for c in matched_concepts if c.get("type") not in ("persona", "instruction")]
             if non_persona_matches:
