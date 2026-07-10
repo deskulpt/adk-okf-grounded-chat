@@ -18,73 +18,88 @@ class OKFEngine:
             os.makedirs(self.directory, exist_ok=True)
             return
 
-        for filename in os.listdir(self.directory):
-            if not filename.endswith(".md"):
-                continue
-            filepath = os.path.join(self.directory, filename)
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Check for YAML frontmatter block
-                if not content.startswith("---"):
-                    print(f"Warning: {filename} does not start with YAML frontmatter separator, skipping.")
+        for root, _, files in os.walk(self.directory):
+            for filename in files:
+                if not filename.endswith(".md"):
                     continue
-                
-                parts = content.split("---", 2)
-                if len(parts) < 3:
-                    print(f"Warning: {filename} has incomplete frontmatter separators, skipping.")
+                # Skip reserved OKF filenames
+                if filename in ("index.md", "log.md"):
                     continue
-                
-                frontmatter_raw = parts[1]
-                body = parts[2].strip()
-                
+
+                filepath = os.path.join(root, filename)
+                rel_path = os.path.relpath(filepath, self.directory)
+                concept_id = os.path.splitext(rel_path)[0]
+
                 try:
-                    frontmatter = yaml.safe_load(frontmatter_raw)
-                except Exception as ex:
-                    print(f"Warning: YAML parse error in {filename}: {ex}, skipping.")
-                    continue
-                
-                if not frontmatter or 'type' not in frontmatter:
-                    print(f"Warning: {filename} frontmatter missing required 'type' field, skipping.")
-                    continue
-                
-                # Title defaults to filename if omitted
-                title = frontmatter.get("title") or os.path.splitext(filename)[0]
-                tags = frontmatter.get("tags") or []
-                if isinstance(tags, str):
-                    tags = [t.strip() for t in tags.split(",") if t.strip()]
-                
-                concept = {
-                    "filename": filename,
-                    "filepath": filepath,
-                    "type": frontmatter["type"],
-                    "title": title,
-                    "tags": tags,
-                    "description": frontmatter.get("description", ""),
-                    "content": body
-                }
-                self.concepts.append(concept)
-                print(f"Loaded OKF Concept: {title} (tags: {tags})")
-            except Exception as e:
-                print(f"Warning: Unhandled error parsing {filename}: {e}, skipping.")
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Check for YAML frontmatter block
+                    if not content.startswith("---"):
+                        print(f"Warning: {rel_path} does not start with YAML frontmatter separator, skipping.")
+                        continue
+                    
+                    parts = content.split("---", 2)
+                    if len(parts) < 3:
+                        print(f"Warning: {rel_path} has incomplete frontmatter separators, skipping.")
+                        continue
+                    
+                    frontmatter_raw = parts[1]
+                    body = parts[2].strip()
+                    
+                    try:
+                        frontmatter = yaml.safe_load(frontmatter_raw)
+                    except Exception as ex:
+                        print(f"Warning: YAML parse error in {rel_path}: {ex}, skipping.")
+                        continue
+                    
+                    if not frontmatter or 'type' not in frontmatter:
+                        print(f"Warning: {rel_path} frontmatter missing required 'type' field, skipping.")
+                        continue
+                    
+                    # Title defaults to the concept base name if omitted
+                    title = frontmatter.get("title") or os.path.basename(concept_id)
+                    tags = frontmatter.get("tags") or []
+                    if isinstance(tags, str):
+                        tags = [t.strip() for t in tags.split(",") if t.strip()]
+                    
+                    concept = {
+                        "id": concept_id,
+                        "filename": filename,
+                        "filepath": filepath,
+                        "type": frontmatter["type"],
+                        "title": title,
+                        "tags": tags,
+                        "description": frontmatter.get("description", ""),
+                        "resource": frontmatter.get("resource", ""),
+                        "timestamp": frontmatter.get("timestamp", ""),
+                        "content": body
+                    }
+                    self.concepts.append(concept)
+                    print(f"Loaded OKF Concept: {concept_id} [Type: {frontmatter['type']}] (title: {title}, tags: {tags})")
+                except Exception as e:
+                    print(f"Warning: Unhandled error parsing {rel_path}: {e}, skipping.")
 
     def match_concept(self, query: str) -> dict | None:
         """
         Scan loaded concepts and return the first matching concept.
-        Matches if any words in the query overlap with the concept's title or tags.
+        Matches if any words in the query overlap with the concept's ID, title, or tags.
         """
-        # Tokenize query to lowercase alphanumeric words
-        query_words = set(re.findall(r'[a-zA-Z0-9]+', query.lower()))
+        # Tokenize query to lowercase alphanumeric words and slashes/dashes
+        query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', query.lower()))
         if not query_words:
             return None
             
         for concept in self.concepts:
-            # Tokenize title and tags
+            # Tokenize ID, title, and tags
+            id_parts = set(re.split(r'[/_-]', concept['id'].lower())) | {concept['id'].lower()}
             title_words = set(re.findall(r'[a-zA-Z0-9]+', concept['title'].lower()))
             tag_words = {tag.lower() for tag in concept['tags']}
             
             # Deterministic matching overlap
-            if title_words.intersection(query_words) or tag_words.intersection(query_words):
+            if (id_parts.intersection(query_words) or 
+                title_words.intersection(query_words) or 
+                tag_words.intersection(query_words)):
                 return concept
         return None
+
