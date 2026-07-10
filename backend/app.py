@@ -249,6 +249,17 @@ description: "Converted URL webpage: {url}"
         return {"error": f"Failed to convert URL: {str(e)}"}
 
 
+def get_base_persona_instructions():
+    persona_blocks = []
+    for c in okf_engine.concepts:
+        if c.get("type") in ("persona", "instruction"):
+            persona_blocks.append(f"### {c['title']} ({c['id']})\n{c['content']}")
+    
+    if persona_blocks:
+        return "You are an AI Agent with the following Git-backed persona and instructions:\n\n" + "\n\n".join(persona_blocks)
+    return "You are a helpful grounding assistant. Provide detailed and accurate responses."
+
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
@@ -319,16 +330,17 @@ async def chat_endpoint(request: Request):
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
             return
 
-        base_instruction = "You are a helpful grounding assistant. Provide detailed and accurate responses."
+        base_instruction = get_base_persona_instructions()
         if is_grounded:
-            grounding_context_parts = []
-            for c in matched_concepts:
-                part = f"--- DOCUMENT: {c['title']} (ID: {c['id']}, Type: {c['type']}) ---\n{c['content']}"
-                grounding_context_parts.append(part)
-            grounding_context = "\n\n".join(grounding_context_parts)
-            
-            agent.instruction = f"""You are Antigravity Grounding Core, a highly intelligent cognitive assistant.
-Your persona is focused on git-backed Open Knowledge Format (OKF) parsing, logical coherence, and strict adherence to grounding context.
+            non_persona_matches = [c for c in matched_concepts if c.get("type") not in ("persona", "instruction")]
+            if non_persona_matches:
+                grounding_context_parts = []
+                for c in non_persona_matches:
+                    part = f"--- DOCUMENT: {c['title']} (ID: {c['id']}, Type: {c['type']}) ---\n{c['content']}"
+                    grounding_context_parts.append(part)
+                grounding_context = "\n\n".join(grounding_context_parts)
+                
+                agent.instruction = f"""{base_instruction}
 
 [REASONING RULES]:
 1. Prioritize Grounding: You must prioritize the facts, figures, and relationships defined in the provided [GROUNDING CONTEXT] above all else.
@@ -342,6 +354,8 @@ Your persona is focused on git-backed Open Knowledge Format (OKF) parsing, logic
 [GROUNDING CONTEXT]:
 {grounding_context}
 """
+            else:
+                agent.instruction = base_instruction
         else:
             agent.instruction = base_instruction
 
