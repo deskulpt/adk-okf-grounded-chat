@@ -1,6 +1,6 @@
 import json
 import asyncio
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.genai import types
@@ -52,12 +52,81 @@ def health_check():
     okf_engine.load_concepts()
     return {"status": "ok", "okf_concepts_loaded": len(okf_engine.concepts)}
 
+@app.get("/api/concepts")
+def get_concepts():
+    # Fetch fresh list of local concepts
+    okf_engine.load_concepts()
+    # Strip full file path for client privacy before sending
+    safe_concepts = []
+    for c in okf_engine.concepts:
+        safe_concepts.append({
+            "id": c["id"],
+            "type": c["type"],
+            "title": c["title"],
+            "tags": c["tags"],
+            "description": c["description"],
+            "resource": c["resource"],
+            "timestamp": c["timestamp"],
+            "content": c["content"]
+        })
+    return {"concepts": safe_concepts}
+
+
+import tempfile
+import os
+import re
+from markitdown import MarkItDown
+
+markitdown = MarkItDown()
+
+@app.post("/api/convert")
+async def convert_file(file: UploadFile = File(...)):
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        result = markitdown.convert(tmp_path)
+        markdown_text = result.text_content
+        
+        title = os.path.splitext(file.filename)[0]
+        clean_title = re.sub(r'[^a-zA-Z0-9]', ' ', title).strip()
+        tags = [t.lower() for t in clean_title.split()[:4]] + ["uploaded", "local"]
+        
+        okf_markdown = f"""---
+type: "Local Document"
+title: "{title}"
+tags: {json.dumps(tags)}
+description: "Converted client-side document: {file.filename}"
+---
+{markdown_text}"""
+        
+        return {
+            "id": f"session/{title.lower().replace(' ', '_')}",
+            "type": "Local Document",
+            "title": title,
+            "tags": tags,
+            "description": f"Converted client-side document: {file.filename}",
+            "content": okf_markdown
+        }
+    except Exception as e:
+        print(f"Error converting document: {e}")
+        return {"error": f"Failed to convert file: {str(e)}"}
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
     use_ai = data.get("use_ai", True)
     api_key = data.get("api_key")
+    local_concepts = data.get("local_concepts", [])
     if not messages:
         return {"error": "No messages provided"}
     
@@ -67,8 +136,21 @@ async def chat_endpoint(request: Request):
     # Reload concepts dynamically on incoming request to ensure fresh index
     okf_engine.load_concepts()
     
-    # Try OKF matching first
-    matched_concept = okf_engine.match_concept(user_query)
+    # Try local client-uploaded concepts first
+    import re
+    matched_concept = None
+    query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', user_query.lower()))
+    for c in local_concepts:
+        id_parts = set(re.split(r'[/_-]', c.get('id', '').lower())) | {c.get('id', '').lower()}
+        title_words = set(re.findall(r'[a-zA-Z0-9]+', c.get('title', '').lower()))
+        tag_words = {t.lower() for t in c.get('tags', [])}
+        if id_parts.intersection(query_words) or title_words.intersection(query_words) or tag_words.intersection(query_words):
+            matched_concept = c
+            break
+            
+    if not matched_concept:
+        matched_concept = okf_engine.match_concept(user_query)
+
     
     async def sse_generator():
         if matched_concept:

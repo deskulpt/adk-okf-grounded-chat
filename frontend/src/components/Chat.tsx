@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText } from 'lucide-react';
 import { Markdown } from './Markdown';
 
 interface Message {
@@ -16,6 +16,15 @@ export const Chat: React.FC = () => {
       content: 'Hello! I am your AI Agent powered by Google ADK and Open Knowledge Format. Ask me about `adk` or `okf` to see local grounding in action!',
     },
   ]);
+  interface Concept {
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    tags: string[];
+    content: string;
+  }
+
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [useAI, setUseAI] = useState(true);
@@ -24,12 +33,26 @@ export const Chat: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'key' | 'guide'>('key');
   const [error, setError] = useState<string | null>(null);
 
+  const [localConcepts, setLocalConcepts] = useState<Concept[]>([]);
+  const [systemConcepts, setSystemConcepts] = useState<Concept[]>([]);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleSaveKey = (val: string) => {
     setApiKey(val);
     localStorage.setItem('openrouter_api_key', val);
   };
+
+  useEffect(() => {
+    fetch('http://localhost:8040/api/concepts')
+      .then(res => res.json())
+      .then(data => setSystemConcepts(data.concepts || []))
+      .catch(err => console.warn('Failed to load system concepts:', err));
+  }, []);
+
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -63,6 +86,7 @@ export const Chat: React.FC = () => {
           })),
           use_ai: useAI,
           api_key: apiKey || undefined,
+          local_concepts: localConcepts,
         }),
       });
 
@@ -136,22 +160,163 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-4xl w-full mx-auto glassmorphism rounded-2xl shadow-2xl overflow-hidden my-4 border border-white/10 h-[calc(100vh-80px)]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <Bot className="w-5 font-bold text-white" />
+    <div className="flex flex-col md:flex-row gap-6 w-full max-w-6xl mx-auto h-[calc(100vh-80px)] my-4 px-4 select-none">
+      {/* Sidebar - Catalog Explorer & File Uploads */}
+      {showSidebar && (
+        <div className="w-full md:w-[300px] shrink-0 glassmorphism rounded-2xl border border-white/10 p-5 flex flex-col h-[300px] md:h-full overflow-hidden animate-fade-in relative z-10">
+          {/* Sidebar Header */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-white/5 mb-4 shrink-0">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4.5 h-4.5 text-indigo-400" />
+              <h3 className="text-xs font-bold text-white tracking-wider uppercase m-0">OKF Catalog Explorer</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSidebar(false)}
+              className="p-1 rounded hover:bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Close Sidebar"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-white tracking-tight font-heading m-0">ADK OKF Agent</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs text-gray-400 font-medium">Local Engine Active</span>
+
+          {/* Privacy Sandbox Card */}
+          <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-left mb-4 shrink-0 shadow-inner">
+            <div className="flex items-center gap-1.5 text-indigo-300 font-bold text-[10px] mb-1.5 uppercase tracking-widest">
+              <Lock className="w-3.5 h-3.5" />
+              <span>🔒 Private Sandbox</span>
+            </div>
+            <p className="text-[10px] text-gray-400 leading-relaxed m-0">
+              Uploaded files are converted and stored entirely in browser memory. No source code or assets are stored on the server or git. To persist files, clone this repository.
+            </p>
+          </div>
+
+          {/* Uploader Dropzone */}
+          <div className="relative border border-dashed border-white/20 hover:border-indigo-500/40 rounded-xl p-4 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.02] flex flex-col items-center gap-1.5 shrink-0 group mb-4">
+            <input
+              type="file"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploadError(null);
+                setIsThinking(true);
+                
+                const formData = new FormData();
+                formData.append("file", file);
+                
+                try {
+                  const res = await fetch("http://localhost:8040/api/convert", {
+                    method: "POST",
+                    body: formData
+                  });
+                  const data = await res.json();
+                  if (data.error) {
+                    setUploadError(data.error);
+                  } else {
+                    setLocalConcepts(prev => {
+                      const filtered = prev.filter(c => c.id !== data.id);
+                      return [...filtered, data];
+                    });
+                  }
+                } catch (err) {
+                  setUploadError("Failed to convert file on backend.");
+                } finally {
+                  setIsThinking(false);
+                }
+              }}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+            <Upload className="w-5.5 h-5.5 text-gray-400 group-hover:text-indigo-400 transition-colors" />
+            <span className="text-[11px] font-semibold text-gray-300">Upload Knowledge File</span>
+            <span className="text-[9px] text-gray-500">PDF, DOCX, TXT, CSV, XLSX</span>
+          </div>
+
+          {uploadError && (
+            <p className="text-[10px] text-rose-400 text-left mb-3 pl-1 font-medium">{uploadError}</p>
+          )}
+
+          {/* Catalog Listing */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-left">
+            {/* System Concepts */}
+            <div>
+              <span className="text-[10px] font-bold text-indigo-400 tracking-widest uppercase block mb-2 select-none">System Grounding ({systemConcepts.length})</span>
+              <div className="space-y-1.5">
+                {systemConcepts.map((concept) => (
+                  <button
+                    key={concept.id}
+                    type="button"
+                    onClick={() => {
+                      setInput(concept.id);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all flex items-start gap-2.5 group cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
+                      <p className="text-[9px] text-gray-500 truncate m-0 font-mono">{concept.id}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Session In-Memory Concepts */}
+            <div>
+              <span className="text-[10px] font-bold text-emerald-400 tracking-widest uppercase block mb-2 select-none">Session Memory ({localConcepts.length})</span>
+              {localConcepts.length === 0 ? (
+                <p className="text-[10px] text-gray-500 italic pl-1 m-0">No uploaded files yet</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {localConcepts.map((concept) => (
+                    <button
+                      key={concept.id}
+                      type="button"
+                      onClick={() => {
+                        setInput(concept.id);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 hover:border-emerald-500/25 transition-all flex items-start gap-2.5 group cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
+                        <p className="text-[9px] text-emerald-500/70 truncate m-0 font-mono">{concept.id}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1 glassmorphism rounded-2xl shadow-2xl overflow-hidden border border-white/10 h-full relative">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0">
+          <div className="flex items-center gap-3">
+            {!showSidebar && (
+              <button
+                type="button"
+                onClick={() => setShowSidebar(true)}
+                className="p-2 -ml-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                title="Show Catalog"
+              >
+                <BookOpen className="w-4.5 h-4.5 text-indigo-400" />
+              </button>
+            )}
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+              <Bot className="w-5 font-bold text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white tracking-tight font-heading m-0">ADK OKF Agent</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs text-gray-400 font-medium">Local Engine Active</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
             <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">AI API Fallback</span>
             <button
@@ -389,5 +554,6 @@ export const Chat: React.FC = () => {
         </div>
       )}
     </div>
-  );
+  </div>
+);
 };
