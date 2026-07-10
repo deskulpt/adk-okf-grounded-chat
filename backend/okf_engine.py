@@ -103,3 +103,24 @@ class OKFEngine:
                 return concept
         return None
 
+    def match_concepts(self, query: str) -> list:
+        """
+        Scan loaded concepts and return all matching concepts.
+        Matches if any words in the query overlap with the concept's ID, title, or tags.
+        """
+        query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', query.lower()))
+        if not query_words:
+            return []
+            
+        matched = []
+        for concept in self.concepts:
+            id_parts = set(re.split(r'[/_-]', concept['id'].lower())) | {concept['id'].lower()}
+            title_words = set(re.findall(r'[a-zA-Z0-9]+', concept['title'].lower()))
+            tag_words = {tag.lower() for tag in concept['tags']}
+            
+            if (id_parts.intersection(query_words) or 
+                title_words.intersection(query_words) or 
+                tag_words.intersection(query_words)):
+                matched.append(concept)
+        return matched
+

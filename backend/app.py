@@ -266,35 +266,51 @@ async def chat_endpoint(request: Request):
     # Reload concepts dynamically on incoming request to ensure fresh index
     okf_engine.load_concepts()
     
-    # Try local client-uploaded concepts first
+    # Match multiple concepts
     import re
-    matched_concept = None
+    matched_concepts = []
     query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', user_query.lower()))
+    
+    # 1. Match local client-uploaded concepts
     for c in local_concepts:
         id_parts = set(re.split(r'[/_-]', c.get('id', '').lower())) | {c.get('id', '').lower()}
         title_words = set(re.findall(r'[a-zA-Z0-9]+', c.get('title', '').lower()))
         tag_words = {t.lower() for t in c.get('tags', [])}
         if id_parts.intersection(query_words) or title_words.intersection(query_words) or tag_words.intersection(query_words):
-            matched_concept = c
-            break
+            matched_concepts.append(c)
             
-    if not matched_concept:
-        matched_concept = okf_engine.match_concept(user_query)
+    # 2. Match system concepts
+    system_matches = okf_engine.match_concepts(user_query)
+    existing_ids = {c['id'] for c in matched_concepts}
+    for c in system_matches:
+        if c['id'] not in existing_ids:
+            matched_concepts.append(c)
+            
+    # 3. Aggregate query match: If query asks to summarize/compare all documents, include all uploaded files
+    query_lower = user_query.lower()
+    if any(w in query_lower for w in ["all files", "uploaded files", "compare", "connections", "summarize everything", "everything uploaded", "all documents"]):
+        for c in local_concepts:
+            if c['id'] not in existing_ids:
+                matched_concepts.append(c)
+                existing_ids.add(c['id'])
 
-    
     async def sse_generator():
-        is_grounded = matched_concept is not None
+        is_grounded = len(matched_concepts) > 0
+        concept_title = ", ".join(c['title'] for c in matched_concepts) if is_grounded else ""
         
         if is_grounded:
-            print(f"OKF Match Found: {matched_concept['title']}")
-            yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+            print(f"OKF Grounded Matches: {concept_title}")
+            yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': concept_title})}\n\n"
             
             if pure_okf:
-                content = matched_concept["content"]
+                combined_text = ""
+                for c in matched_concepts:
+                    combined_text += f"# {c['title']} (ID: {c['id']}, Type: {c['type']})\n\n{c['content']}\n\n---\n\n"
+                
                 chunk_size = 40
-                for i in range(0, len(content), chunk_size):
-                    chunk = content[i:i+chunk_size]
-                    yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+                for i in range(0, len(combined_text), chunk_size):
+                    chunk = combined_text[i:i+chunk_size]
+                    yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': concept_title})}\n\n"
                     await asyncio.sleep(0.01)
                 return
             
@@ -305,12 +321,26 @@ async def chat_endpoint(request: Request):
 
         base_instruction = "You are a helpful grounding assistant. Provide detailed and accurate responses."
         if is_grounded:
-            agent.instruction = f"""{base_instruction}
-You are grounded by the following local OKF context. Answer the user's question concisely based ONLY on this context. Do not make up facts outside the context.
-If the user is simply asking to show, display, or read the document, you can show the relevant parts or the entire document.
+            grounding_context_parts = []
+            for c in matched_concepts:
+                part = f"--- DOCUMENT: {c['title']} (ID: {c['id']}, Type: {c['type']}) ---\n{c['content']}"
+                grounding_context_parts.append(part)
+            grounding_context = "\n\n".join(grounding_context_parts)
+            
+            agent.instruction = f"""You are Antigravity Grounding Core, a highly intelligent cognitive assistant.
+Your persona is focused on git-backed Open Knowledge Format (OKF) parsing, logical coherence, and strict adherence to grounding context.
+
+[REASONING RULES]:
+1. Prioritize Grounding: You must prioritize the facts, figures, and relationships defined in the provided [GROUNDING CONTEXT] above all else.
+2. Cross-Document Synthesis: If multiple documents are present in the context, you must actively draw connections, find correlations, identify contradictions, and summarize key insights across them. Show how they relate.
+3. Citation & Transparency: In your response, clearly mention which documents (by Title or ID) you are citing or pulling information from.
+4. Professional & Concise Tone: Be direct, precise, and user-friendly. Avoid repeating raw document dumps unless explicitly asked to do so.
+5. Verification & Fallback Boundaries: If the user asks a question that is NOT covered by the context:
+   - If AI Fallback is active, answer using general knowledge but clearly state that it is outside the local grounded files.
+   - If general knowledge is uncertain, state: "I cannot find this information in the provided grounding context."
 
 [GROUNDING CONTEXT]:
-{matched_concept['content']}
+{grounding_context}
 """
         else:
             agent.instruction = base_instruction
