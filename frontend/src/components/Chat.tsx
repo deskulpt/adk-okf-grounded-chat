@@ -5,9 +5,36 @@ import { Markdown } from './Markdown';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  thinking?: string;
   okfMatch?: boolean;
   concept?: string;
 }
+
+const ThinkingBlock: React.FC<{ thinking: string }> = ({ thinking }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden text-left mb-1.5 transition-all w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-indigo-400/85 hover:text-indigo-455 bg-white/[0.01] hover:bg-white/[0.02] transition-colors border-0 outline-none cursor-pointer"
+      >
+        <span className="flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 animate-pulse text-indigo-400 animate-duration-1000" />
+          <span>Agent Thinking Process</span>
+        </span>
+        <span className="text-[9px] text-gray-500 hover:underline">
+          {isOpen ? 'Collapse' : 'Expand'}
+        </span>
+      </button>
+      {isOpen && (
+        <div className="px-3 pb-3 pt-1 border-t border-white/[0.03] text-[11px] text-gray-400 leading-relaxed font-mono whitespace-pre-wrap select-text max-h-[160px] overflow-y-auto bg-black/[0.05] italic border-l-2 border-indigo-500/50">
+          {thinking}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -29,6 +56,7 @@ export const Chat: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [useAI, setUseAI] = useState(true);
   const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
+  const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') !== 'false');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [activeTab, setActiveTab] = useState<'key' | 'profile' | 'guide'>('key');
@@ -49,6 +77,10 @@ export const Chat: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('pure_okf', pureOkf.toString());
   }, [pureOkf]);
+
+  useEffect(() => {
+    localStorage.setItem('show_thinking', showThinking.toString());
+  }, [showThinking]);
 
   useEffect(() => {
     localStorage.setItem('agent_name', agentName);
@@ -191,10 +223,39 @@ export const Chat: React.FC = () => {
                 assistantMessage.concept = data.concept;
               }
               
-              // Append streamed text chunk
+              let hasChange = false;
+              if (data.thinking) {
+                assistantMessage.thinking = (assistantMessage.thinking || '') + data.thinking;
+                hasChange = true;
+              }
               if (data.text) {
                 assistantMessage.content += data.text;
-                // Trigger state update to force re-render with new content
+                hasChange = true;
+              }
+              if (hasChange) {
+                let rawText = assistantMessage.content;
+                let rawThinking = assistantMessage.thinking || '';
+                
+                if (rawText.includes('<think>')) {
+                  const parts = rawText.split('<think>');
+                  const beforeThink = parts[0];
+                  const afterThink = parts.slice(1).join('<think>');
+                  
+                  if (afterThink.includes('</think>')) {
+                    const subParts = afterThink.split('</think>');
+                    const thinkText = subParts[0];
+                    const afterThinkText = subParts.slice(1).join('</think>');
+                    rawThinking = (rawThinking ? rawThinking + '\n' : '') + thinkText;
+                    rawText = beforeThink + afterThinkText;
+                  } else {
+                    rawThinking = (rawThinking ? rawThinking + '\n' : '') + afterThink;
+                    rawText = beforeThink;
+                  }
+                }
+                
+                assistantMessage.content = rawText;
+                assistantMessage.thinking = rawThinking;
+                
                 setMessages((prev) => {
                   const updated = [...prev];
                   updated[updated.length - 1] = { ...assistantMessage };
@@ -466,6 +527,23 @@ export const Chat: React.FC = () => {
                 />
               </button>
             </div>
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
+              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">Show Thinking</span>
+              <button
+                type="button"
+                onClick={() => setShowThinking(!showThinking)}
+                className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                  showThinking ? 'bg-indigo-500' : 'bg-white/10'
+                }`}
+                title="Display cognitive reasoning traces"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showThinking ? 'translate-x-4.5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           <button 
             onClick={() => setShowSettings(true)}
             className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
@@ -502,6 +580,10 @@ export const Chat: React.FC = () => {
                     <CheckCircle className="w-3.5 h-3.5" />
                     <span>OKF Grounded: <strong>{msg.concept}</strong></span>
                   </div>
+                )}
+
+                {!isUser && msg.thinking && showThinking && (
+                  <ThinkingBlock thinking={msg.thinking} />
                 )}
 
                 <div
