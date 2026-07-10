@@ -7,7 +7,7 @@ This roadmap defines the path to building the ADK OKF Agent UI, a standalone cha
 ## Phases
 
 - [x] **Phase 1: Backend Core & OKF Engine** - Setup FastAPI, ADK 2.0, LiteLLM routing, and OKF indexer/matching logic. (completed 2026-07-10)
-- [ ] **Phase 2: Frontend React Chat UI** - Build the standalone React app with agent-elements components.
+- [x] **Phase 2: Frontend React Chat UI** - Build the standalone React app with agent-elements components. (completed 2026-07-10)
 - [ ] **Phase 3: Integration & Local Verification** - Connect frontend and backend, bundle sample OKF concepts, and launch local testing.
 
 ## Phase Details
@@ -44,12 +44,15 @@ Plans:
   1. Frontend displays a responsive chat shell with thinking indicators and message lists.
   2. Message responses render markdown and stream text incrementally.
 
-**Plans**: 2 plans
+**Plans**: 2/2 plans complete
 
 Plans:
 
-- [ ] 02-01: Scaffold Vite React app, setup Tailwind CSS v4, Radix, and install agent-elements components.
-- [ ] 02-02: Wire chat input, streaming event source (SSE) consumer, and message history state management.
+- [x] 02-01-PLAN.md
+- [x] 02-02-PLAN.md
+
+- [x] 02-01: Scaffold Vite React app, setup Tailwind CSS v4, Radix, and install agent-elements components.
+- [x] 02-02: Wire chat input, streaming event source (SSE) consumer, and message history state management.
 
 ### Phase 3: Integration & Local Verification
 
@@ -76,5 +79,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Core & OKF Engine | 2/2 | Complete   | 2026-07-10 |
-| 2. Frontend React Chat UI | 0/2 | Not started | - |
+| 2. Frontend React Chat UI | 2/2 | Complete   | 2026-07-10 |
 | 3. Integration & Local Verification | 0/1 | Not started | - |
