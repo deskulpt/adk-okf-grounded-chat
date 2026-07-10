@@ -88,8 +88,31 @@ async def convert_file(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        result = markitdown.convert(tmp_path)
-        markdown_text = result.text_content
+        if suffix.lower() in ['.pages', '.numbers', '.key']:
+            import zipfile
+            try:
+                with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+                    pdf_files = [f for f in zip_ref.namelist() if f.lower().endswith('preview.pdf')]
+                    if pdf_files:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as pdf_tmp:
+                            pdf_tmp.write(zip_ref.read(pdf_files[0]))
+                            pdf_path = pdf_tmp.name
+                        try:
+                            result = markitdown.convert(pdf_path)
+                            markdown_text = result.text_content
+                        finally:
+                            if os.path.exists(pdf_path):
+                                os.remove(pdf_path)
+                    else:
+                        result = markitdown.convert(tmp_path)
+                        markdown_text = result.text_content
+            except Exception as zip_err:
+                print(f"Zip extraction failed for mac file: {zip_err}")
+                result = markitdown.convert(tmp_path)
+                markdown_text = result.text_content
+        else:
+            result = markitdown.convert(tmp_path)
+            markdown_text = result.text_content
         
         title = os.path.splitext(file.filename)[0]
         clean_title = re.sub(r'[^a-zA-Z0-9]', ' ', title).strip()
@@ -118,6 +141,43 @@ description: "Converted client-side document: {file.filename}"
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+
+@app.post("/api/convert_url")
+async def convert_url(request: Request):
+    data = await request.json()
+    url = data.get("url")
+    if not url:
+        return {"error": "No URL provided"}
+    try:
+        result = markitdown.convert(url)
+        markdown_text = result.text_content
+        
+        title = url.split('/')[-1] or "webpage"
+        if not title.endswith('.html'):
+            title = title + ".html"
+            
+        clean_title = re.sub(r'[^a-zA-Z0-9]', ' ', title).strip()
+        tags = [t.lower() for t in clean_title.split()[:4]] + ["url", "web"]
+        
+        okf_markdown = f"""---
+type: "Webpage Link"
+title: "{url}"
+tags: {json.dumps(tags)}
+description: "Converted URL webpage: {url}"
+---
+{markdown_text}"""
+        
+        return {
+            "id": f"session/url_{re.sub(r'[^a-zA-Z0-9]', '_', url.lower())[:50]}",
+            "type": "Webpage Link",
+            "title": url,
+            "tags": tags,
+            "description": f"Converted URL webpage: {url}",
+            "content": okf_markdown
+        }
+    except Exception as e:
+        print(f"Error converting URL: {e}")
+        return {"error": f"Failed to convert URL: {str(e)}"}
 
 
 @app.post("/api/chat")

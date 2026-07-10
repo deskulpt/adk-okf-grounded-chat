@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus } from 'lucide-react';
 import { Markdown } from './Markdown';
 
 interface Message {
@@ -37,6 +37,8 @@ export const Chat: React.FC = () => {
   const [systemConcepts, setSystemConcepts] = useState<Concept[]>([]);
   const [showSidebar, setShowSidebar] = useState(true);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,8 +53,34 @@ export const Chat: React.FC = () => {
       .then(data => setSystemConcepts(data.concepts || []))
       .catch(err => console.warn('Failed to load system concepts:', err));
   }, []);
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput.trim() || isThinking) return;
+    setUrlError(null);
+    setIsThinking(true);
 
-
+    try {
+      const res = await fetch("http://localhost:8040/api/convert_url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput.trim() })
+      });
+      const data = await res.json();
+      if (data.error) {
+        setUrlError(data.error);
+      } else {
+        setLocalConcepts(prev => {
+          const filtered = prev.filter(c => c.id !== data.id);
+          return [...filtered, data];
+        });
+        setUrlInput('');
+      }
+    } catch (err) {
+      setUrlError("Failed to convert URL page content.");
+    } finally {
+      setIsThinking(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -195,7 +223,7 @@ export const Chat: React.FC = () => {
           <div className="relative border border-dashed border-white/20 hover:border-indigo-500/40 rounded-xl p-4 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.02] flex flex-col items-center gap-1.5 shrink-0 group mb-4">
             <input
               type="file"
-              accept=".pdf,.docx,.xlsx,.pptx,.html,.htm,.xml,.csv,.json,.txt,.zip,.png,.jpg,.jpeg,.mp3,.wav"
+              accept=".pdf,.docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.rtf,.html,.htm,.xml,.csv,.json,.txt,.zip,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.m4a,.avi,.mkv,.pages,.numbers,.key,.md,.mp3,.wav"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -229,12 +257,39 @@ export const Chat: React.FC = () => {
             />
             <Upload className="w-5.5 h-5.5 text-gray-400 group-hover:text-indigo-400 transition-colors" />
             <span className="text-[11px] font-semibold text-gray-300">Upload Knowledge File</span>
-            <span className="text-[9px] text-gray-500">PDF, DOCX, XLSX, PPTX, HTML, XML, ZIP, TXT, JSON, CSV</span>
+            <span className="text-[9px] text-gray-500">PDF, DOC/X, XLS/X, PPT/X, ODT, ODS, HTML, XML, ZIP, MD, Mac, Media</span>
           </div>
 
           {uploadError && (
             <p className="text-[10px] text-rose-400 text-left mb-3 pl-1 font-medium">{uploadError}</p>
           )}
+
+          {/* URL Ingestion Form */}
+          <form onSubmit={handleUrlSubmit} className="mb-4 shrink-0">
+            <div className="flex items-center gap-1.5 rounded-xl bg-white/[0.02] border border-white/10 p-1 group focus-within:border-indigo-500/50 transition-colors">
+              <div className="pl-2.5 text-gray-500 group-focus-within:text-indigo-400 transition-colors">
+                <Globe className="w-4 h-4" />
+              </div>
+              <input
+                type="url"
+                required
+                placeholder="Ingest URL (https://...)"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="flex-1 min-w-0 bg-transparent border-none text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-0 py-1.5"
+              />
+              <button
+                type="submit"
+                className="p-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white transition-colors cursor-pointer"
+                title="Convert Webpage"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {urlError && (
+              <p className="text-[10px] text-rose-400 text-left mt-1.5 pl-1 font-medium">{urlError}</p>
+            )}
+          </form>
 
           {/* Catalog Listing */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-left">
