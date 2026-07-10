@@ -1,0 +1,112 @@
+import json
+import asyncio
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from google.genai import types
+from google.adk import Agent, Runner
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+from google.adk.apps import App
+
+from okf_engine import OKFEngine
+import shared
+
+app = FastAPI(title="ADK OKF Agent Backend")
+
+# Enable CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize OKF Engine and services
+okf_engine = OKFEngine()
+session_service = InMemorySessionService()
+artifact_service = InMemoryArtifactService()
+memory_service = InMemoryMemoryService()
+
+# Root agent setup using ADK 2.x and LiteLLM model provider
+agent = Agent(
+    name="okf_agent",
+    model=shared.DEFAULT_MODEL,
+    instruction="You are a helpful grounding assistant. Provide detailed and accurate responses."
+)
+
+# Wrap agent in an ADK App
+adk_app = App(name="okf_agent_app", root_agent=agent)
+runner = Runner(
+    app=adk_app,
+    artifact_service=artifact_service,
+    session_service=session_service,
+    memory_service=memory_service,
+)
+
+@app.get("/api/health")
+def health_check():
+    # Reload concepts dynamically so we pick up new markdown files without restarting
+    okf_engine.load_concepts()
+    return {"status": "ok", "okf_concepts_loaded": len(okf_engine.concepts)}
+
+@app.post("/api/chat")
+async def chat_endpoint(request: Request):
+    data = await request.json()
+    messages = data.get("messages", [])
+    if not messages:
+        return {"error": "No messages provided"}
+    
+    # Get the latest user query
+    user_query = messages[-1].get("content", "")
+    
+    # Reload concepts dynamically on incoming request to ensure fresh index
+    okf_engine.load_concepts()
+    
+    # Try OKF matching first
+    matched_concept = okf_engine.match_concept(user_query)
+    
+    async def sse_generator():
+        if matched_concept:
+            # Local OKF match found! Stream it.
+            print(f"OKF Match Found: {matched_concept['title']}")
+            # Yield metadata block
+            yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+            
+            # Stream the content with simulated chunking
+            content = matched_concept["content"]
+            chunk_size = 40
+            for i in range(0, len(content), chunk_size):
+                chunk = content[i:i+chunk_size]
+                yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+                await asyncio.sleep(0.01)
+        else:
+            # Fallback to ADK agent loop using OpenRouter
+            print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}'")
+            session = await session_service.create_session(
+                app_name="okf_agent_app",
+                user_id="user_1"
+            )
+            content_msg = types.Content(
+                role="user",
+                parts=[types.Part(text=user_query)]
+            )
+            
+            try:
+                async for event in runner.run_async(
+                    user_id=session.user_id,
+                    session_id=session.id,
+                    new_message=content_msg
+                ):
+                    if event.content and event.content.parts:
+                        text_chunks = [p.text for p in event.content.parts if p.text]
+                        if text_chunks:
+                            joined_text = "".join(text_chunks)
+                            yield f"data: {json.dumps({'text': joined_text, 'okf_match': False})}\n\n"
+            except Exception as e:
+                print(f"Error calling ADK Agent: {e}")
+                yield f"data: {json.dumps({'text': f'Error: Failed to fetch response from OpenRouter: {e}', 'okf_match': False})}\n\n"
+                
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
