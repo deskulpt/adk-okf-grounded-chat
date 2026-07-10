@@ -28,6 +28,7 @@ export const Chat: React.FC = () => {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [useAI, setUseAI] = useState(true);
+  const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [activeTab, setActiveTab] = useState<'key' | 'guide'>('key');
@@ -41,6 +42,10 @@ export const Chat: React.FC = () => {
   const [urlError, setUrlError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('pure_okf', pureOkf.toString());
+  }, [pureOkf]);
 
   const handleSaveKey = (val: string) => {
     setApiKey(val);
@@ -119,6 +124,7 @@ export const Chat: React.FC = () => {
             content: m.content,
           })),
           use_ai: useAI,
+          pure_okf: pureOkf,
           api_key: apiKey || undefined,
           local_concepts: localConcepts,
         }),
@@ -382,22 +388,40 @@ export const Chat: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-            <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">AI API Fallback</span>
-            <button
-              type="button"
-              onClick={() => setUseAI(!useAI)}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                useAI ? 'bg-indigo-500' : 'bg-white/10'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  useAI ? 'translate-x-4.5' : 'translate-x-0'
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
+              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">Pure OKF</span>
+              <button
+                type="button"
+                onClick={() => setPureOkf(!pureOkf)}
+                className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                  pureOkf ? 'bg-indigo-500' : 'bg-white/10'
                 }`}
-              />
-            </button>
-          </div>
+                title="Bypass LLM and display raw markdown directly for matches"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pureOkf ? 'translate-x-4.5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
+              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">AI Fallback</span>
+              <button
+                type="button"
+                onClick={() => setUseAI(!useAI)}
+                className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                  useAI ? 'bg-indigo-500' : 'bg-white/10'
+                }`}
+                title="Use LLM fallback when no OKF match is found"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    useAI ? 'translate-x-4.5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           <button 
             onClick={() => setShowSettings(true)}
             className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"

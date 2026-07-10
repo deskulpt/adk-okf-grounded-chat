@@ -254,6 +254,7 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
     use_ai = data.get("use_ai", True)
+    pure_okf = data.get("pure_okf", False)
     api_key = data.get("api_key")
     local_concepts = data.get("local_concepts", [])
     if not messages:
@@ -287,6 +288,15 @@ async def chat_endpoint(request: Request):
         if is_grounded:
             print(f"OKF Match Found: {matched_concept['title']}")
             yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+            
+            if pure_okf:
+                content = matched_concept["content"]
+                chunk_size = 40
+                for i in range(0, len(content), chunk_size):
+                    chunk = content[i:i+chunk_size]
+                    yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
+                    await asyncio.sleep(0.01)
+                return
             
         if not use_ai and not is_grounded:
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
