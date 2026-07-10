@@ -1,12 +1,17 @@
-# Dependencies
-node_modules/
-.venv/
-venv/
-dist/
+# Secrets
+.env
+.env.*
+!.env.example
 
-# Python caching
+# Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
-# System files
+# Node
+node_modules/
+dist/
+
+# OS
 .DS_Store

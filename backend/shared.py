@@ -1,17 +1,14 @@
 import os
 import litellm
+from dotenv import load_dotenv
+
+load_dotenv()  # pull OPENROUTER_API_KEY from .env (gitignored)
 
 # OpenRouter key from environment only — never hardcoded.
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-<<<<<<< fix/thinking-isolation-model-routing
 # OpenRouter Free Preset Routing
-# In OpenRouter, "openrouter/free" routes to available free models automatically.
-# We also use the preset/open-free routing instructions provided.
 DEFAULT_MODEL = "litellm:openrouter/google/gemini-2.5-flash"
-=======
-DEFAULT_MODEL = "litellm:openrouter/tencent/hy3:free"
->>>>>>> local
 
 # litellm.api_key is set per-request in app.py (custom key or default),
 # so no global assignment here.
