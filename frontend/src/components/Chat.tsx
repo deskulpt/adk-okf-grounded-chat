@@ -232,6 +232,9 @@ export const Chat: React.FC = () => {
                 
                 const formData = new FormData();
                 formData.append("file", file);
+                if (apiKey) {
+                  formData.append("api_key", apiKey);
+                }
                 
                 try {
                   const res = await fetch("http://localhost:8040/api/convert", {

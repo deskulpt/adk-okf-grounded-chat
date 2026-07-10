@@ -1,6 +1,6 @@
 import json
 import asyncio
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.genai import types
@@ -80,7 +80,7 @@ from markitdown import MarkItDown
 markitdown = MarkItDown()
 
 @app.post("/api/convert")
-async def convert_file(file: UploadFile = File(...)):
+async def convert_file(file: UploadFile = File(...), api_key: str = Form(None)):
     suffix = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content = await file.read()
@@ -88,7 +88,57 @@ async def convert_file(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        if suffix.lower() in ['.pages', '.numbers', '.key']:
+        if suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.gif'] and api_key:
+            import base64
+            import litellm
+            try:
+                base64_image = base64.b64encode(content).decode('utf-8')
+                mime_type = file.content_type or "image/jpeg"
+                response = litellm.completion(
+                    model="openrouter/google/gemini-2.5-flash",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Describe this image in detail. Extract any visible text verbatim. Format as clean markdown suitable for a knowledge catalog."},
+                            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                        ]
+                    }],
+                    api_key=api_key
+                )
+                markdown_text = response.choices[0].message.content
+            except Exception as ai_err:
+                print(f"AI Image transcription failed: {ai_err}")
+                result = markitdown.convert(tmp_path)
+                markdown_text = result.text_content
+        elif suffix.lower() in ['.mp3', '.wav', '.ogg', '.flac'] and api_key:
+            import base64
+            import litellm
+            try:
+                base64_audio = base64.b64encode(content).decode('utf-8')
+                mime_type = file.content_type or "audio/mp3"
+                response = litellm.completion(
+                    model="openrouter/google/gemini-2.5-flash",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Verbatim transcribe the spoken content of this audio file, summarizing key points in clean markdown format."},
+                            {
+                                "type": "input_file",
+                                "input_file": {
+                                    "mime_type": mime_type,
+                                    "data": base64_audio
+                                }
+                            }
+                        ]
+                    }],
+                    api_key=api_key
+                )
+                markdown_text = response.choices[0].message.content
+            except Exception as ai_err:
+                print(f"AI Audio transcription failed: {ai_err}")
+                result = markitdown.convert(tmp_path)
+                markdown_text = result.text_content
+        elif suffix.lower() in ['.pages', '.numbers', '.key']:
             import zipfile
             try:
                 with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
