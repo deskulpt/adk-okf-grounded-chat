@@ -210,6 +210,16 @@ async def convert_url(request: Request):
         result = markitdown.convert(url)
         markdown_text = result.text_content
         
+        from urllib.parse import urljoin
+        def replace_link(match):
+            link_text = match.group(1)
+            link_url = match.group(2)
+            if not re.match(r'^(https?://|mailto:|tel:)', link_url, re.IGNORECASE):
+                return f"[{link_text}]({urljoin(url, link_url)})"
+            return match.group(0)
+            
+        markdown_text = re.sub(r'\[([^\]]*)\]\(([^)]+)\)', replace_link, markdown_text)
+        
         title = url.split('/')[-1] or "webpage"
         if not title.endswith('.html'):
             title = title + ".html"
