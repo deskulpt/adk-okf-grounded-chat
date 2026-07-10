@@ -91,11 +91,15 @@ async def convert_file(file: UploadFile = File(...), api_key: str = Form(None)):
         if suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.gif'] and api_key:
             import base64
             import litellm
+            import os
             try:
                 base64_image = base64.b64encode(content).decode('utf-8')
                 mime_type = file.content_type or "image/jpeg"
+                model = "gemini/gemini-2.5-flash" if api_key.startswith("AIzaSy") else "openrouter/google/gemini-2.5-flash"
+                if api_key.startswith("AIzaSy"):
+                    os.environ["GEMINI_API_KEY"] = api_key
                 response = litellm.completion(
-                    model="openrouter/google/gemini-2.5-flash",
+                    model=model,
                     messages=[{
                         "role": "user",
                         "content": [
@@ -113,11 +117,15 @@ async def convert_file(file: UploadFile = File(...), api_key: str = Form(None)):
         elif suffix.lower() in ['.mp3', '.wav', '.ogg', '.flac'] and api_key:
             import base64
             import litellm
+            import os
             try:
                 base64_audio = base64.b64encode(content).decode('utf-8')
                 mime_type = file.content_type or "audio/mp3"
+                model = "gemini/gemini-2.5-flash" if api_key.startswith("AIzaSy") else "openrouter/google/gemini-2.5-flash"
+                if api_key.startswith("AIzaSy"):
+                    os.environ["GEMINI_API_KEY"] = api_key
                 response = litellm.completion(
-                    model="openrouter/google/gemini-2.5-flash",
+                    model=model,
                     messages=[{
                         "role": "user",
                         "content": [
@@ -280,15 +288,25 @@ async def chat_endpoint(request: Request):
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
         else:
-            # Fallback to ADK agent loop using OpenRouter
+            # Fallback to ADK agent loop
             import litellm
+            import os
             if api_key:
-                print("Using custom OpenRouter API Key provided in request payload.")
-                litellm.api_key = api_key
+                if api_key.startswith("AIzaSy"):
+                    print("Using Google AI Studio API Key. Routing directly to Gemini 2.5 Flash.")
+                    agent.model = "gemini/gemini-2.5-flash"
+                    os.environ["GEMINI_API_KEY"] = api_key
+                    litellm.api_key = api_key
+                else:
+                    print("Using custom OpenRouter API Key.")
+                    agent.model = "openrouter/google/gemini-2.5-flash"
+                    litellm.api_key = api_key
             else:
+                print("Using default OpenRouter free preset.")
+                agent.model = shared.DEFAULT_MODEL
                 litellm.api_key = shared.OPENROUTER_KEY
                 
-            print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}'")
+            print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}' using model '{agent.model}'")
             session = await session_service.create_session(
                 app_name="okf_agent_app",
                 user_id="user_1"
