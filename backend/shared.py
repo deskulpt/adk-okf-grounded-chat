@@ -10,7 +10,7 @@ OPENROUTER_KEY = os.environ.get(
 # OpenRouter Free Preset Routing
 # In OpenRouter, "openrouter/free" routes to available free models automatically.
 # We also use the preset/open-free routing instructions provided.
-DEFAULT_MODEL = "litellm:openrouter/tencent/hy3:free"
+DEFAULT_MODEL = "litellm:openrouter/google/gemini-2.5-flash"
 
 # Configure LiteLLM globally
 litellm.api_key = OPENROUTER_KEY

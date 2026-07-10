@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { Markdown } from './Markdown';
 
 interface Message {
@@ -10,31 +10,38 @@ interface Message {
   concept?: string;
 }
 
+// ponytail: thinking collapses into an accordion; shown only when Show Thinking toggle is on. Excluded from the response body.
 const ThinkingBlock: React.FC<{ thinking: string }> = ({ thinking }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden text-left mb-1.5 transition-all w-full">
+    <div className="mb-1.5 rounded-lg border border-white/5 bg-white/[0.01] overflow-hidden">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-indigo-400/85 hover:text-indigo-455 bg-white/[0.01] hover:bg-white/[0.02] transition-colors border-0 outline-none cursor-pointer"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-gray-400 hover:text-gray-200 transition-colors cursor-pointer outline-none"
       >
-        <span className="flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 animate-pulse text-indigo-400 animate-duration-1000" />
-          <span>Agent Thinking Process</span>
-        </span>
-        <span className="text-[9px] text-gray-500 hover:underline">
-          {isOpen ? 'Collapse' : 'Expand'}
-        </span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? '' : '-rotate-90'}`} />
+        <span>Thinking</span>
       </button>
-      {isOpen && (
-        <div className="px-3 pb-3 pt-1 border-t border-white/[0.03] text-[11px] text-gray-400 leading-relaxed font-mono whitespace-pre-wrap select-text max-h-[160px] overflow-y-auto bg-black/[0.05] italic border-l-2 border-indigo-500/50">
+      {open && (
+        <div className="px-3 pb-3 pt-1 border-t border-white/[0.03] text-[11px] italic leading-relaxed text-gray-400/80 whitespace-pre-wrap select-text max-h-[200px] overflow-y-auto pl-3 border-l-2 border-white/10">
           {thinking}
         </div>
       )}
     </div>
   );
 };
+
+// ponytail: pull pure-OKF "Possible follow-up" bullets out so they render as clickable chips, not markdown text
+function extractFollowups(content: string): { body: string; followups: string[] } {
+  const marker = '**Possible follow-up:**';
+  const idx = content.indexOf(marker);
+  if (idx === -1) return { body: content, followups: [] };
+  const body = content.slice(0, idx).trim();
+  const fuText = content.slice(idx + marker.length);
+  const followups = fuText.split('\n').map(l => l.replace(/^[-*]\s*/, '').trim()).filter(Boolean);
+  return { body, followups };
+}
 
 export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -56,7 +63,7 @@ export const Chat: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [useAI, setUseAI] = useState(true);
   const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
-  const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') !== 'false');
+  const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') === 'true');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [activeTab, setActiveTab] = useState<'key' | 'profile' | 'guide'>('key');
@@ -153,17 +160,16 @@ export const Chat: React.FC = () => {
     scrollToBottom();
   }, [messages, isThinking]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isThinking) return;
+  const submitQuery = async (text: string) => {
+    const q = text.trim();
+    if (!q || isThinking) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const userMessage: Message = { role: 'user', content: q };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsThinking(true);
     setError(null);
 
-    // Prepare message history payload for the backend
     const updatedMessages = [...messages, userMessage];
 
     try {
@@ -235,21 +241,35 @@ export const Chat: React.FC = () => {
               if (hasChange) {
                 let rawText = assistantMessage.content;
                 let rawThinking = assistantMessage.thinking || '';
-                
-                if (rawText.includes('<think>')) {
-                  const parts = rawText.split('<think>');
-                  const beforeThink = parts[0];
-                  const afterThink = parts.slice(1).join('<think>');
-                  
-                  if (afterThink.includes('</think>')) {
-                    const subParts = afterThink.split('</think>');
-                    const thinkText = subParts[0];
-                    const afterThinkText = subParts.slice(1).join('</think>');
-                    rawThinking = (rawThinking ? rawThinking + '\n' : '') + thinkText;
-                    rawText = beforeThink + afterThinkText;
-                  } else {
-                    rawThinking = (rawThinking ? rawThinking + '\n' : '') + afterThink;
-                    rawText = beforeThink;
+
+                // ponytail: separate <think>...</think> reasoning from the answer.
+                // Handles streaming partial tags by keeping an unterminated tag in the
+                // text block until its closing tag arrives.
+                if (rawText.includes('<think>') || rawText.includes('</think>') || rawText.includes('<thinking>') || rawText.includes('</thinking>')) {
+                  // ponytail: split on FIRST reasoning tag (handles <think>, <thinking> and
+                  // the Gemini/OpenAI native <reasoning> too). Unterminated tag stays in
+                  // rawText so the next chunk re-enters this branch; its content is held in
+                  // rawThinking. Models that emit no tag → nothing matches → full text = answer.
+                  const openRe = /<think(?:ing)?>|<reasoning>/i;
+                  const closeRe = /<\/think(?:ing)?>|<\/reasoning>/i;
+                  const openMatch = openRe.exec(rawText);
+                  const closeMatch = closeRe.exec(rawText);
+                  if (openMatch && (!closeMatch || openMatch.index < closeMatch.index)) {
+                    const openTag = openMatch[0];
+                    const beforeThink = rawText.slice(0, openMatch.index);
+                    const afterOpen = rawText.slice(openMatch.index + openTag.length);
+                    const cMatch = closeRe.exec(afterOpen);
+                    if (cMatch) {
+                      const thinkText = afterOpen.slice(0, cMatch.index);
+                      const afterThink = afterOpen.slice(cMatch.index + cMatch[0].length);
+                      rawThinking = (rawThinking ? rawThinking + '\n' : '') + thinkText;
+                      rawText = beforeThink + afterThink;
+                    } else {
+                      rawThinking = (rawThinking ? rawThinking + '\n' : '') + afterOpen;
+                      rawText = beforeThink + openTag + afterOpen;
+                    }
+                  } else if (closeMatch) {
+                    rawText = rawText.slice(closeMatch.index + closeMatch[0].length);
                   }
                 }
                 
@@ -281,6 +301,11 @@ export const Chat: React.FC = () => {
     } finally {
       setIsThinking(false);
     }
+  };
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitQuery(input);
   };
 
   return (
@@ -586,19 +611,40 @@ export const Chat: React.FC = () => {
                   <ThinkingBlock thinking={msg.thinking} />
                 )}
 
-                <div
-                  className={`px-4 py-3 rounded-2xl shadow-sm text-sm ${
-                    isUser
-                      ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-tr-none border border-indigo-400/20'
-                      : 'bg-white/[0.03] text-gray-200 border border-white/5 rounded-tl-none'
-                  }`}
-                >
-                  {isUser ? (
-                    <p className="whitespace-pre-wrap select-text text-left leading-relaxed">{msg.content}</p>
-                  ) : (
-                    <Markdown content={msg.content || '...'} onLinkClick={(val) => setInput(val)} />
-                  )}
-                </div>
+                {(() => {
+                  const { body, followups } = extractFollowups(msg.content);
+                  return (
+                    <>
+                      <div
+                        className={`px-4 py-3 rounded-2xl shadow-sm text-sm ${
+                          isUser
+                            ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-tr-none border border-indigo-400/20'
+                            : 'bg-white/[0.03] text-gray-200 border border-white/5 rounded-tl-none'
+                        }`}
+                      >
+                        {isUser ? (
+                          <p className="whitespace-pre-wrap select-text text-left leading-relaxed">{body}</p>
+                        ) : (
+                          <Markdown content={body || '...'} onLinkClick={(val) => setInput(val)} />
+                        )}
+                      </div>
+                      {followups.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-0.5">
+                          {followups.map((f, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => submitQuery(f)}
+                              className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40 transition-colors cursor-pointer"
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {isUser && (
