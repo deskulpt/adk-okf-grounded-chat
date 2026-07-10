@@ -75,6 +75,21 @@ def get_concepts():
     return {"concepts": safe_concepts}
 
 
+@app.delete("/api/concepts/{concept_id}")
+def delete_concept(concept_id: str):
+    # ponytail: system grounding files are deletable by id (file remove + reload)
+    okf_engine.load_concepts()
+    target = next((c for c in okf_engine.concepts if c["id"] == concept_id), None)
+    if not target:
+        return {"error": f"Concept '{concept_id}' not found"}
+    try:
+        os.remove(target["filepath"])
+        okf_engine.load_concepts()
+        return {"deleted": concept_id}
+    except Exception as e:
+        return {"error": f"Failed to delete: {e}"}
+
+
 import tempfile
 import re
 from markitdown import MarkItDown
@@ -305,6 +320,7 @@ async def chat_endpoint(request: Request):
     messages = data.get("messages", [])
     use_ai = data.get("use_ai", True)
     pure_okf = data.get("pure_okf", False)
+    use_system_grounding = data.get("use_system_grounding", True)
     api_key = data.get("api_key")
     agent_name = data.get("agent_name", "Antigravity Grounding Core")
     agent_tone = data.get("agent_tone", "Helpful, warm, concise, professional")
@@ -335,7 +351,7 @@ async def chat_endpoint(request: Request):
             matched_concepts.append(c)
             
     # 2. Match system concepts
-    system_matches = okf_engine.match_concepts(user_query)
+    system_matches = okf_engine.match_concepts(user_query) if use_system_grounding else []
     existing_ids = {c['id'] for c in matched_concepts}
     for c in system_matches:
         if c.get("type") in ("persona", "instruction"):

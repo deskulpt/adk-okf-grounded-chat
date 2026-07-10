@@ -64,6 +64,7 @@ export const Chat: React.FC = () => {
   const [useAI, setUseAI] = useState(true);
   const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
   const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') === 'true');
+  const [useSystemGrounding, setUseSystemGrounding] = useState(() => localStorage.getItem('use_system_grounding') !== 'false');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [activeTab, setActiveTab] = useState<'key' | 'profile' | 'guide'>('key');
@@ -112,6 +113,14 @@ export const Chat: React.FC = () => {
       .then(data => setSystemConcepts(data.concepts || []))
       .catch(err => console.warn('Failed to load system concepts:', err));
   }, []);
+  const removeSystemConcept = async (id: string) => {
+    try {
+      await fetch(`http://localhost:8040/api/concepts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      setSystemConcepts(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      console.warn('Failed to delete system concept:', err);
+    }
+  };
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetUrl = urlInput.trim();
@@ -183,6 +192,7 @@ export const Chat: React.FC = () => {
           })),
           use_ai: useAI,
           pure_okf: pureOkf,
+          use_system_grounding: useSystemGrounding,
           api_key: apiKey || undefined,
           agent_name: agentName,
           agent_tone: agentTone,
@@ -425,23 +435,43 @@ export const Chat: React.FC = () => {
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-left">
             {/* System Concepts */}
             <div>
-              <span className="text-[10px] font-bold text-indigo-400 tracking-widest uppercase block mb-2 select-none">System Grounding ({systemConcepts.length})</span>
+              <span className="text-[10px] font-bold text-indigo-400 tracking-widest uppercase block mb-2 select-none flex items-center justify-between">
+                <span>System Grounding ({systemConcepts.length})</span>
+                <button
+                  type="button"
+                  onClick={() => setUseSystemGrounding(v => { localStorage.setItem('use_system_grounding', String(!v)); return !v; })}
+                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${useSystemGrounding ? 'bg-indigo-500' : 'bg-white/10'}`}
+                  title="Use system grounding files for matching"
+                >
+                  <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useSystemGrounding ? 'translate-x-3' : 'translate-x-0'}`} />
+                </button>
+              </span>
               <div className="space-y-1.5">
                 {systemConcepts.map((concept) => (
-                  <button
+                  <div
                     key={concept.id}
-                    type="button"
-                    onClick={() => {
-                      setInput(concept.id);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all flex items-start gap-2.5 group cursor-pointer"
+                    className="w-full flex items-center justify-between gap-1.5 p-1 rounded-xl bg-white/[0.01] border border-white/5 hover:border-white/10 group hover:bg-white/[0.03] transition-all select-none"
                   >
-                    <FileText className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
-                      <p className="text-[9px] text-gray-500 truncate m-0 font-mono">{concept.id}</p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setInput(concept.id)}
+                      className="flex-1 text-left px-2 py-1 flex items-start gap-2.5 min-w-0 bg-transparent border-0 cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors m-0">{concept.title}</p>
+                        <p className="text-[9px] text-gray-500 truncate m-0 font-mono">{concept.id}</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeSystemConcept(concept.id); }}
+                      className="p-1.5 rounded-lg text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border-0 mr-1 shrink-0"
+                      title="Remove system grounding file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -509,24 +539,24 @@ export const Chat: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
               <Bot className="w-5 font-bold text-white" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white tracking-tight font-heading m-0">ADK OKF Agent</h2>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="min-w-0 whitespace-nowrap">
+              <h2 className="text-lg font-semibold text-white tracking-tight font-heading m-0 whitespace-nowrap">ADK OKF Agent</h2>
+              <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 <span className="text-xs text-gray-400 font-medium">Local Engine Active</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">Pure OKF</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
+              <span className={`text-[11px] md:text-xs font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>Gemini:Free Tier</span>
               <button
                 type="button"
                 onClick={() => setPureOkf(!pureOkf)}
                 className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
                   pureOkf ? 'bg-indigo-500' : 'bg-white/10'
                 }`}
-                title="Bypass LLM and display raw markdown directly for matches"
+                title="Toggle between Gemini free tier and pure OKF (no LLM) mode"
               >
                 <span
                   className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -534,9 +564,10 @@ export const Chat: React.FC = () => {
                   }`}
                 />
               </button>
+              <span className={`text-[11px] md:text-xs font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-indigo-300' : 'text-gray-500'}`}>Pure OKF</span>
             </div>
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">AI Fallback</span>
+              <span className="text-[11px] md:text-xs font-semibold tracking-wider text-gray-400 select-none uppercase">Enable AI Keys</span>
               <button
                 type="button"
                 onClick={() => setUseAI(!useAI)}
