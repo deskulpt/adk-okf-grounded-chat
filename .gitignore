@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+dist/
+
+# Python caching
+__pycache__/
+*.pyc
+
+# System files
+.DS_Store
