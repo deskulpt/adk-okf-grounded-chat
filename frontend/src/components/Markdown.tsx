@@ -3,9 +3,10 @@ import { X } from 'lucide-react';
 
 interface MarkdownProps {
   content: string;
+  onLinkClick?: (url: string) => void;
 }
 
-export const Markdown: React.FC<MarkdownProps> = ({ content }) => {
+export const Markdown: React.FC<MarkdownProps> = ({ content, onLinkClick }) => {
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
@@ -41,16 +42,16 @@ export const Markdown: React.FC<MarkdownProps> = ({ content }) => {
 
     // Header block parsing
     if (line.startsWith('# ')) {
-      elements.push(<h1 key={i} className="text-xl md:text-2xl font-bold font-heading mt-5 mb-2 text-white text-left tracking-tight">{parseInline(line.slice(2), handleImageClick)}</h1>);
+      elements.push(<h1 key={i} className="text-xl md:text-2xl font-bold font-heading mt-5 mb-2 text-white text-left tracking-tight">{parseInline(line.slice(2), handleImageClick, onLinkClick)}</h1>);
     } else if (line.startsWith('## ')) {
-      elements.push(<h2 key={i} className="text-lg md:text-xl font-bold font-heading mt-4 mb-2 text-white text-left tracking-tight">{parseInline(line.slice(3), handleImageClick)}</h2>);
+      elements.push(<h2 key={i} className="text-lg md:text-xl font-bold font-heading mt-4 mb-2 text-white text-left tracking-tight">{parseInline(line.slice(3), handleImageClick, onLinkClick)}</h2>);
     } else if (line.startsWith('### ')) {
-      elements.push(<h3 key={i} className="text-md md:text-lg font-bold font-heading mt-3 mb-1 text-white text-left">{parseInline(line.slice(4), handleImageClick)}</h3>);
+      elements.push(<h3 key={i} className="text-md md:text-lg font-bold font-heading mt-3 mb-1 text-white text-left">{parseInline(line.slice(4), handleImageClick, onLinkClick)}</h3>);
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
       elements.push(
         <div key={i} className="flex items-start my-1 text-gray-300 text-left pl-2">
           <span className="text-indigo-400 mr-2 mt-1.5 text-xs">•</span>
-          <span className="flex-1 text-sm md:text-base">{parseInline(line.slice(2), handleImageClick)}</span>
+          <span className="flex-1 text-sm md:text-base">{parseInline(line.slice(2), handleImageClick, onLinkClick)}</span>
         </div>
       );
     } else if (/^\d+\.\s/.test(line)) {
@@ -59,13 +60,13 @@ export const Markdown: React.FC<MarkdownProps> = ({ content }) => {
       elements.push(
         <div key={i} className="flex items-start my-1 text-gray-300 text-left pl-2">
           <span className="text-indigo-400 mr-2 font-mono text-xs mt-0.5">{num}.</span>
-          <span className="flex-1 text-sm md:text-base">{parseInline(parts[1], handleImageClick)}</span>
+          <span className="flex-1 text-sm md:text-base">{parseInline(parts[1], handleImageClick, onLinkClick)}</span>
         </div>
       );
     } else if (line.trim() === '') {
       elements.push(<div key={i} className="h-2" />);
     } else {
-      elements.push(<p key={i} className="my-1.5 text-sm md:text-base leading-relaxed text-gray-300 text-left">{parseInline(line, handleImageClick)}</p>);
+      elements.push(<p key={i} className="my-1.5 text-sm md:text-base leading-relaxed text-gray-300 text-left">{parseInline(line, handleImageClick, onLinkClick)}</p>);
     }
   }
 
@@ -103,7 +104,11 @@ export const Markdown: React.FC<MarkdownProps> = ({ content }) => {
   );
 };
 
-function parseInline(text: string, onImageClick: (url: string) => void): React.ReactNode[] {
+function parseInline(
+  text: string, 
+  onImageClick: (url: string) => void,
+  onLinkClick?: (url: string) => void
+): React.ReactNode[] {
   const tokenRegex = /(!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)|`.*?`|\*\*.*?\*\*)/g;
   const parts = text.split(tokenRegex);
   
@@ -141,17 +146,37 @@ function parseInline(text: string, onImageClick: (url: string) => void): React.R
       if (match) {
         const linkText = match[1];
         const url = match[2];
-        return (
-          <a
-            key={index}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer transition-colors"
-          >
-            {linkText}
-          </a>
-        );
+        const isExternal = /^(https?:\/\/|mailto:|tel:)/i.test(url);
+        
+        if (isExternal) {
+          return (
+            <a
+              key={index}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer transition-colors"
+            >
+              {linkText}
+            </a>
+          );
+        } else {
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Strip extension like .md, .markdown, .html etc. to convert to concept ID
+                const conceptId = url.replace(/\.[^/.]+$/, "");
+                onLinkClick?.(conceptId);
+              }}
+              className="text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer transition-colors bg-transparent border-0 p-0 inline align-baseline font-inherit"
+            >
+              {linkText}
+            </button>
+          );
+        }
       }
     }
     

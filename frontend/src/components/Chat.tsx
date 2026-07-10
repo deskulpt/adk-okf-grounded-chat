@@ -440,7 +440,7 @@ export const Chat: React.FC = () => {
                   {isUser ? (
                     <p className="whitespace-pre-wrap select-text text-left leading-relaxed">{msg.content}</p>
                   ) : (
-                    <Markdown content={msg.content || '...'} />
+                    <Markdown content={msg.content || '...'} onLinkClick={(val) => setInput(val)} />
                   )}
                 </div>
               </div>
