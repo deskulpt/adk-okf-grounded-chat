@@ -195,6 +195,7 @@ export const Chat: React.FC = () => {
           <div className="relative border border-dashed border-white/20 hover:border-indigo-500/40 rounded-xl p-4 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.02] flex flex-col items-center gap-1.5 shrink-0 group mb-4">
             <input
               type="file"
+              accept=".pdf,.docx,.xlsx,.pptx,.html,.htm,.xml,.csv,.json,.txt,.zip,.png,.jpg,.jpeg,.mp3,.wav"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -228,7 +229,7 @@ export const Chat: React.FC = () => {
             />
             <Upload className="w-5.5 h-5.5 text-gray-400 group-hover:text-indigo-400 transition-colors" />
             <span className="text-[11px] font-semibold text-gray-300">Upload Knowledge File</span>
-            <span className="text-[9px] text-gray-500">PDF, DOCX, TXT, CSV, XLSX</span>
+            <span className="text-[9px] text-gray-500">PDF, DOCX, XLSX, PPTX, HTML, XML, ZIP, TXT, JSON, CSV</span>
           </div>
 
           {uploadError && (
