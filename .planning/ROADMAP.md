@@ -9,6 +9,7 @@ This roadmap defines the path to building the ADK OKF Agent UI, a standalone cha
 - [x] **Phase 1: Backend Core & OKF Engine** - Setup FastAPI, ADK 2.0, LiteLLM routing, and OKF indexer/matching logic. (completed 2026-07-10)
 - [x] **Phase 2: Frontend React Chat UI** - Build the standalone React app with agent-elements components. (completed 2026-07-10)
 - [x] **Phase 3: Integration & Local Verification** - Connect frontend and backend, bundle sample OKF concepts, and launch local testing. (completed 2026-07-10)
+- [ ] **Phase 4: Client-Side Session Knowledge & MarkItDown Conversion** - Enable local file uploads, backend markitdown conversions, and live in-memory querying.
 
 ## Phase Details
 
@@ -73,13 +74,32 @@ Plans:
 
 - [x] 03-01: Set up sample OKF markdown files, configure startup scripts, and run manual walkthrough validations.
 
+### Phase 4: Client-Side Session Knowledge & MarkItDown Conversion
+
+**Goal**: Implement client-side document uploads, backend conversion using `markitdown`, in-memory session concept matching, and catalog UI explorer with a secure privacy notice.
+**Mode**: mvp
+**Depends on**: Phase 3
+**Requirements**: None
+**Success Criteria** (what must be TRUE):
+  1. User can drag/drop or upload any document file (PDF, Word, TXT, HTML) on the UI.
+  2. Converted document markdown content is stored client-side in session memory.
+  3. User queries matching the uploaded document dynamically stream the document and show the OKF Grounded badge.
+
+**Plans**: 0/1 plans complete
+
+Plans:
+- [ ] 04-01-PLAN.md
+- [ ] 04-01: Build frontend upload sidebar catalog explorer and integrate backend markitdown conversion endpoint.
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Core & OKF Engine | 2/2 | Complete   | 2026-07-10 |
 | 2. Frontend React Chat UI | 2/2 | Complete   | 2026-07-10 |
 | 3. Integration & Local Verification | 1/1 | Complete   | 2026-07-10 |
+| 4. Client-Side Session Knowledge | 0/1 | Pending    | -          |
+
