@@ -203,9 +203,12 @@ description: "Converted client-side document: {file.filename}"
 @app.post("/api/convert_url")
 async def convert_url(request: Request):
     data = await request.json()
-    url = data.get("url")
+    url = data.get("url", "").strip()
     if not url:
         return {"error": "No URL provided"}
+        
+    if not url.lower().startswith(("http://", "https://")):
+        url = "https://" + url
     try:
         result = markitdown.convert(url)
         markdown_text = result.text_content

@@ -55,7 +55,13 @@ export const Chat: React.FC = () => {
   }, []);
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim() || isThinking) return;
+    let targetUrl = urlInput.trim();
+    if (!targetUrl || isThinking) return;
+    
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = "https://" + targetUrl;
+    }
+    
     setUrlError(null);
     setIsThinking(true);
 
@@ -63,7 +69,7 @@ export const Chat: React.FC = () => {
       const res = await fetch("http://localhost:8040/api/convert_url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlInput.trim() })
+        body: JSON.stringify({ url: targetUrl })
       });
       const data = await res.json();
       if (data.error) {
@@ -274,7 +280,7 @@ export const Chat: React.FC = () => {
                 <Globe className="w-4 h-4" />
               </div>
               <input
-                type="url"
+                type="text"
                 required
                 placeholder="Ingest URL (https://...)"
                 value={urlInput}
