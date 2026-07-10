@@ -284,6 +284,8 @@ async def chat_endpoint(request: Request):
     
     # 1. Match local client-uploaded concepts
     for c in local_concepts:
+        if c.get("type") in ("persona", "instruction"):
+            continue
         id_parts = set(re.split(r'[/_-]', c.get('id', '').lower())) | {c.get('id', '').lower()}
         title_words = set(re.findall(r'[a-zA-Z0-9]+', c.get('title', '').lower()))
         tag_words = {t.lower() for t in c.get('tags', [])}
@@ -294,6 +296,8 @@ async def chat_endpoint(request: Request):
     system_matches = okf_engine.match_concepts(user_query)
     existing_ids = {c['id'] for c in matched_concepts}
     for c in system_matches:
+        if c.get("type") in ("persona", "instruction"):
+            continue
         if c['id'] not in existing_ids:
             matched_concepts.append(c)
             
@@ -301,6 +305,8 @@ async def chat_endpoint(request: Request):
     query_lower = user_query.lower()
     if any(w in query_lower for w in ["all files", "uploaded files", "compare", "connections", "summarize everything", "everything uploaded", "all documents"]):
         for c in local_concepts:
+            if c.get("type") in ("persona", "instruction"):
+                continue
             if c['id'] not in existing_ids:
                 matched_concepts.append(c)
                 existing_ids.add(c['id'])
