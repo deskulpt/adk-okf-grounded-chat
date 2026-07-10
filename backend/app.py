@@ -56,6 +56,7 @@ def health_check():
 async def chat_endpoint(request: Request):
     data = await request.json()
     messages = data.get("messages", [])
+    use_ai = data.get("use_ai", True)
     if not messages:
         return {"error": "No messages provided"}
     
@@ -82,6 +83,9 @@ async def chat_endpoint(request: Request):
                 chunk = content[i:i+chunk_size]
                 yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': matched_concept['title']})}\n\n"
                 await asyncio.sleep(0.01)
+        elif not use_ai:
+            print(f"No OKF Match and use_ai is disabled. Returning notification.")
+            yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
         else:
             # Fallback to ADK agent loop using OpenRouter
             print(f"No OKF Match. Routing to LLM fallback for query: '{user_query}'")
