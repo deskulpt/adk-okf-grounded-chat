@@ -223,7 +223,7 @@ export const Chat: React.FC = () => {
           <div className="relative border border-dashed border-white/20 hover:border-indigo-500/40 rounded-xl p-4 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.02] flex flex-col items-center gap-1.5 shrink-0 group mb-4">
             <input
               type="file"
-              accept=".pdf,.docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.rtf,.html,.htm,.xml,.csv,.json,.txt,.zip,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.m4a,.avi,.mkv,.pages,.numbers,.key,.md,.mp3,.wav"
+              accept=".pdf,.docx,.xlsx,.pptx,.doc,.xls,.ppt,.odt,.ods,.odp,.rtf,.html,.htm,.xml,.csv,.json,.txt,.zip,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.m4a,.avi,.mkv,.pages,.numbers,.key,.md,.mp3,.wav,.mobi,.epub,.rss,.opml,.markdown,.tex,.latex,.org,.rst,.wiki,.mediawiki,.dokuwiki"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
