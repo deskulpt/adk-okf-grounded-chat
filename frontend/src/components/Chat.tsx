@@ -367,7 +367,7 @@ export const Chat: React.FC = () => {
     <div className="flex flex-col md:flex-row gap-0 md:gap-6 w-full max-w-6xl mx-auto h-[100dvh] md:h-[calc(100vh-48px)] md:my-4 px-0 md:px-4 select-none safe-pad">
       {viewConcept && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
-          <div className="glassmorphism okf-drawer rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 relative z-[61] animate-fade-in">
+          <div className="surface-solid rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 relative z-[61] animate-fade-in">
             <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 shrink-0">
               <button
                 type="button"
