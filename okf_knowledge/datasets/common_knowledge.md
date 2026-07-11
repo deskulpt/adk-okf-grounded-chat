@@ -16,4 +16,13 @@ What can you do? I answer questions grounded in your uploaded documents, and han
 
 ## Help and Capabilities
 
-Need help? Ask me to summarize, compare, or explain your documents. I can correct spelling and grammar, chat, and point you to the right document. Enable AI keys for open-ended questions beyond your files. Turn on system grounding to search your uploaded knowledge base.
+Need help? Here is how to use this agent.
+
+1. Add knowledge: open the Catalog Explorer (book icon, top-right) and upload documents — PDF, DOCX, markdown, CSV, and more. They become searchable concepts.
+2. Ask grounded questions: type a question about your files, e.g. "What's in the Q2 sales report?" or "Compare the two product specs." Matching documents are cited in the answer.
+3. Browse a concept: click any item in the sidebar to open its markdown, view or edit it, and save changes.
+4. Toggle modes (top bar): Pure OKF = answers only from your files, no external AI. Enable AI Keys = fall back to a general LLM for anything not in your documents. Show Catalog = open/close the sidebar.
+5. Theme: use the sun/moon button to switch light and dark.
+6. Settings: the gear icon opens OpenRouter settings — paste a key to unlock AI fallback, or use the free preset.
+
+I can also correct spelling and grammar, chat, and point you to the right document. Enable AI keys for open-ended questions beyond your files. Turn on system grounding to search your uploaded knowledge base.
