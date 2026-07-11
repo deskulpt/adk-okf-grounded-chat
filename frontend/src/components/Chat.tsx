@@ -724,7 +724,7 @@ export const Chat: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap pt-3 border-t border-white/5">
             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>Gemini:Free</span>
+              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>Free AI</span>
               <button
                 type="button"
                 onClick={() => setPureOkf(!pureOkf)}
