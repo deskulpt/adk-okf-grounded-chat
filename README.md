@@ -26,6 +26,8 @@ Traditional Retrieval-Augmented Generation (RAG) models index documents as flat,
 *   **Git-Backed Knowledge Versioning**: Plain text Markdown files stored inside the repository represent the agent's knowledge base. Updates are managed via standard developer workflows (commits, pull requests, and peer code/doc reviews).
 *   **Client-Side Ingestion Sandbox**: Drag-and-drop complex document types (PDFs, images, audios, Pages, Numbers, Keynote) or paste URLs. The backend compiles them into OKF-compliant Markdown files on the fly.
 *   **Offline Sentence Synthesis**: A toggled "Pure OKF Mode" completely bypasses LLMs, executing a local, rule-based search, extractive sentence synthesis, and potential follow-up suggestions 100% privately.
+*   **Dynamic Concept Management (CRUD)**: The API provides full `PUT` and `DELETE` endpoints, allowing users to edit, overwrite, and delete Git-backed OKF markdown concepts directly from the interface.
+*   **Common Knowledge Fallback**: A built-in offline responder handles common queries gracefully without crashing, even when the AI API is disconnected or disabled.
 
 
 <img width="1152" height="818" alt="Screenshot 2026-07-10 at 6 34 59 PM" src="https://github.com/user-attachments/assets/8523bd90-1b30-49d3-8c30-8bad9274a3bd" />
@@ -152,7 +154,7 @@ chmod +x start.sh
 
 ```
 ├── backend/
-│   ├── app.py                # FastAPI main application & SSE chat endpoint
+│   ├── app.py                # FastAPI main application & SSE chat endpoint (with full CRUD)
 │   ├── okf_engine.py         # Deterministic concept loader and overlap matcher
 │   ├── shared.py             # OpenRouter and LiteLLM configurations
 │   └── requirements.txt      # Python dependencies (adk, litellm, markitdown)
