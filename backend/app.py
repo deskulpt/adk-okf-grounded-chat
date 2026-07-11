@@ -1,6 +1,7 @@
 import json
 import asyncio
 import os
+import re
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -332,6 +333,30 @@ def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500) ->
     return text + fu
 
 
+# ponytail: offline "essential LLM" — single file-backed common-knowledge responder.
+# Used when grounding is off AND no AI keys, so the bot isn't a dead end. Reuses synthesize_okf.
+_COMMON_PATH = os.path.join(os.path.dirname(__file__), "..", "okf_knowledge", "datasets", "common_knowledge.md")
+_common_concept = None
+
+def _get_common_concept() -> dict:
+    global _common_concept
+    if _common_concept is None:
+        try:
+            with open(_COMMON_PATH, encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            content = ""
+        _common_concept = {"id": "system/common_knowledge", "title": "Common Knowledge", "content": content, "type": "common"}
+    return _common_concept
+
+def _match_common(query: str, concept: dict) -> bool:
+    qterms = {t for t in re.findall(r"[a-zA-Z0-9_]+", query.lower()) if len(t) > 2}
+    if not qterms:
+        return True  # greetings like "hi" carry no terms; let common answer
+    # ponytail: any overlap between query terms and the doc => respond; keyword scan, no semantics
+    return any(t in concept["content"].lower() for t in qterms)
+
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
@@ -405,6 +430,13 @@ async def chat_endpoint(request: Request):
                 return
             
         if not use_ai and not is_grounded:
+            # ponytail: offline "essential LLM" — answer common queries without AI/grounding
+            common = _get_common_concept()
+            if _match_common(user_query, common):
+                print("Common-knowledge match (no AI, no grounding).")
+                synthesized = synthesize_okf([common], user_query)
+                yield f"data: {json.dumps({'text': synthesized, 'okf_match': False, 'concept': 'Common Knowledge'})}\n\n"
+                return
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
             return
