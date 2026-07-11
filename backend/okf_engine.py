@@ -109,11 +109,24 @@ class OKFEngine:
         """
         Scan loaded concepts and return all matching concepts.
         Matches if any words in the query overlap with the concept's ID, title, or tags.
+        ponytail: also co-locates related docs by shared body tokens (1-hop), so a
+        query hitting one doc pulls its join-related siblings (e.g. revenue report
+        also drags in sales/products). ceiling: O(n^2) token overlap; fine for <100
+        docs, build an inverted index if the corpus scales.
         """
-        query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', query.lower()))
+        # ponytail: stopwords + short tokens ignored so generic schema words
+        # (table, data, id) don't glue unrelated docs together.
+        STOP = {"the", "and", "for", "with", "this", "that", "from", "into", "your",
+                "are", "was", "have", "has", "will", "not", "but", "all", "can",
+                "data", "table", "column", "value", "each", "item", "type", "name",
+                "list", "used", "use", "using", "field", "fields", "when", "then"}
+        def _tokens(s):
+            return {t for t in re.findall(r'[a-zA-Z0-9_]{4,}', s.lower()) if t not in STOP}
+
+        query_words = _tokens(query)
         if not query_words:
             return []
-            
+
         matched = []
         for concept in self.concepts:
             if concept.get("type") in ("persona", "instruction"):
@@ -121,10 +134,33 @@ class OKFEngine:
             id_parts = set(re.split(r'[/_-]', concept['id'].lower())) | {concept['id'].lower()}
             title_words = set(re.findall(r'[a-zA-Z0-9]+', concept['title'].lower()))
             tag_words = {tag.lower() for tag in concept['tags']}
-            
-            if (id_parts.intersection(query_words) or 
-                title_words.intersection(query_words) or 
+
+            if (id_parts.intersection(query_words) or
+                title_words.intersection(query_words) or
                 tag_words.intersection(query_words)):
                 matched.append(concept)
+
+        if matched:
+            seeds = {c['id'] for c in matched}
+            for concept in self.concepts:
+                if concept['id'] in seeds or concept.get("type") in ("persona", "instruction"):
+                    continue
+                cbody = _tokens(concept['content'])
+                for m in matched:
+                    mbody = _tokens(m['content'])
+                    if len(cbody & mbody) >= 4:  # shared >=4 real terms => related
+                        matched.append(concept)
+                        seeds.add(concept['id'])
+                        break
         return matched
+
+
+if __name__ == "__main__":
+    eng = OKFEngine()
+    # ponytail: prove 1-hop co-location — a query whose terms live only in the
+    # report still drags in the docs it joins against.
+    hits = eng.match_concepts("total revenue margin")
+    ids = {c["id"] for c in hits}
+    assert any("sales" in i for i in ids), f"co-location failed, got {ids}"
+    print("okf_engine co-location:", sorted(ids))
 
