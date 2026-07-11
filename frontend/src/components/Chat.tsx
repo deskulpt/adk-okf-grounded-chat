@@ -367,7 +367,7 @@ export const Chat: React.FC = () => {
     <div className="flex flex-col md:flex-row gap-0 md:gap-6 w-full max-w-6xl mx-auto h-[100dvh] md:h-[calc(100vh-48px)] md:my-4 px-0 md:px-4 select-none safe-pad">
       {viewConcept && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
-          <div className="glassmorphism okf-drawer rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 relative animate-fade-in">
+          <div className="glassmorphism okf-drawer rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 relative z-[61] animate-fade-in">
             <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -671,30 +671,55 @@ export const Chat: React.FC = () => {
           </div>
         )}
         {/* Header */}
-        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-y-2 bg-white/[0.02] shrink-0 safe-pad">
-          <div className="flex items-center gap-3 min-w-0">
-            {!showSidebar && (
-              <button
-                type="button"
-                onClick={() => setShowSidebar(true)}
-                className="p-2 -ml-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0"
-                title="Show Catalog"
-              >
-                <BookOpen className="w-4.5 h-4.5 text-indigo-400" />
-              </button>
-            )}
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
-              <Bot className="w-5 font-bold text-white" />
-            </div>
-            <div className="min-w-0 flex flex-col">
-              <h2 className="text-base md:text-lg font-semibold text-white tracking-tight font-heading m-0 leading-tight truncate">ADK OKF Agent</h2>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="text-[10px] md:text-xs text-gray-400 font-medium whitespace-nowrap">Local Engine Active</span>
+        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-white/5 bg-white/[0.02] shrink-0 safe-pad flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+                <Bot className="w-5 font-bold text-white" />
+              </div>
+              <div className="min-w-0 flex flex-col">
+                <h2 className="text-base md:text-lg font-semibold text-white tracking-tight font-heading m-0 leading-tight truncate">ADK OKF Agent</h2>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-[10px] md:text-xs text-gray-400 font-medium whitespace-nowrap">Local Engine Active</span>
+                </div>
               </div>
             </div>
+            <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+              {!showSidebar && (
+                <button
+                  type="button"
+                  onClick={() => setShowSidebar(true)}
+                  className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors cursor-pointer border border-white/10"
+                  title="Show Catalog"
+                >
+                  <BookOpen className="w-4.5 h-4.5 text-indigo-400" />
+                </button>
+              )}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors border border-white/10"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors border border-white/10"
+              title="OpenRouter Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMessages([{ role: 'assistant', content: 'Hello! Message log cleared. Ask me anything!' }])}
+              className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors border border-white/10"
+              title="Clear Conversation"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          </div>
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap pt-3 border-t border-white/5">
             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
               <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>Gemini:Free</span>
               <button
@@ -747,28 +772,7 @@ export const Chat: React.FC = () => {
                 />
               </button>
             </div>
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors shrink-0 border border-white/10"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
-            title="OpenRouter Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setMessages([{ role: 'assistant', content: 'Hello! Message log cleared. Ask me anything!' }])}
-            className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
-            title="Clear Conversation"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+          </div>
       </div>
 
       {/* Message List */}
@@ -894,11 +898,11 @@ export const Chat: React.FC = () => {
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300">
-          <div className="glassmorphism rounded-2xl w-full max-w-lg shadow-2xl border border-white/10 flex flex-col relative overflow-hidden text-left">
+        <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 transition-all duration-300">
+          <div className="surface-solid rounded-2xl w-full max-w-lg shadow-2xl border border-white/10 flex flex-col relative z-[71] overflow-hidden text-left">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/[0.01]">
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
               <div className="flex items-center gap-2.5">
                 <Settings className="w-5 h-5 text-indigo-400" />
                 <h3 className="text-base font-semibold text-white tracking-tight font-heading m-0">OpenRouter Settings</h3>

@@ -64,6 +64,9 @@ html.light .okf-drawer {
   .okf-drawer { background: transparent; }
   html.light .okf-drawer { background: transparent; }
 }
+/* ponytail: opaque surface that stays solid at all breakpoints (modals, not the drawer) */
+.surface-solid { background: #15161e; }
+html.light .surface-solid { background: #f3f4f6; }
 
 .text-gradient {
   background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #6366f1 100%);
