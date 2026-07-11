@@ -70,7 +70,6 @@ export const Chat: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [useAI, setUseAI] = useState(true);
   const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
   const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') === 'true');
   const [useSystemGrounding, setUseSystemGrounding] = useState(() => localStorage.getItem('use_system_grounding') !== 'false');
@@ -238,7 +237,7 @@ export const Chat: React.FC = () => {
             role: m.role,
             content: m.content,
           })),
-          use_ai: useAI,
+          use_ai: !pureOkf,
           pure_okf: pureOkf,
           use_system_grounding: useSystemGrounding,
           api_key: apiKey || undefined,
@@ -724,10 +723,10 @@ export const Chat: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap pt-3 border-t border-white/5">
             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>+AI API</span>
+              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-indigo-300' : 'text-gray-500'}`}>Pure OKF</span>
               <button
                 type="button"
-                onClick={() => { const next = !pureOkf; setPureOkf(next); if (!next) setUseAI(false); }}
+                onClick={() => setPureOkf(!pureOkf)}
                 className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
                   pureOkf ? 'bg-indigo-500' : 'bg-white/10'
                 }`}
@@ -739,24 +738,7 @@ export const Chat: React.FC = () => {
                   }`}
                 />
               </button>
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-indigo-300' : 'text-gray-500'}`}>Pure OKF</span>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-2.5 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className="text-[10px] md:text-[11px] font-semibold tracking-wider text-gray-400 select-none uppercase">AI Keys</span>
-              <button
-                type="button"
-                onClick={() => setUseAI(!useAI)}
-                className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                  useAI ? 'bg-indigo-500' : 'bg-white/10'
-                }`}
-                title="Use LLM fallback when no OKF match is found"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-3.5 w-3.5 md:h-4.5 md:w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    useAI ? 'translate-x-3.5 md:translate-x-4.5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>+AI API</span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2.5 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
               <span className="text-[10px] md:text-[11px] font-semibold tracking-wider text-gray-400 select-none uppercase">Thinking</span>

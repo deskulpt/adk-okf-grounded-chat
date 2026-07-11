@@ -17,7 +17,7 @@ from google.adk.tools import FunctionTool
 
 def get_weather(city: str) -> str:
     """Return the current weather for a city."""
-    return f"Sunny in {city}"
+    return "Sunny in " + city
 
 agent = Agent(
     name="weather_agent",
