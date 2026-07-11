@@ -731,7 +731,7 @@ export const Chat: React.FC = () => {
                 className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
                   pureOkf ? 'bg-indigo-500' : 'bg-white/10'
                 }`}
-                title="Toggle between Gemini free tier and pure OKF (no LLM) mode"
+                title="Toggle between Free AI (OpenRouter) and pure OKF (no LLM) mode"
               >
                 <span
                   className={`pointer-events-none inline-block h-3.5 w-3.5 md:h-4.5 md:w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
