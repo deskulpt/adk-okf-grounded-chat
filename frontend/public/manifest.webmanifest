@@ -1,0 +1,13 @@
+{
+  "name": "ADK OKF Grounded Chat",
+  "short_name": "ADK OKF",
+  "description": "Local-first AI agent grounded in Git-backed Open Knowledge Format.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d0e12",
+  "theme_color": "#0d0e12",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

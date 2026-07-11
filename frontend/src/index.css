@@ -2,11 +2,18 @@
 
 @import "tailwindcss";
 
+/* ponytail: theme tokens. Dark is default (no class). `.light` opts into light.
+   Inner components use hardcoded white/opacity utilities; light mode flips the
+   most visible surfaces via targeted overrides below — full token refactor is a
+   later step if a cleaner palette is wanted. */
 :root {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-heading: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  color-scheme: dark;
 }
+
+html.light { color-scheme: light; }
 
 body {
   font-family: var(--font-sans);
@@ -17,29 +24,23 @@ body {
   min-height: 100vh;
 }
 
+html.light body {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
 /* Custom Scrollbar styles */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-}
-
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 8px; }
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); border: 2px solid transparent; background-clip: padding-box; }
+html.light ::-webkit-scrollbar-track { background: rgba(0,0,0,0.06); }
+html.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); }
 
 /* Custom styling helper classes */
 .glassmorphism {
@@ -48,9 +49,34 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+html.light .glassmorphism {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+/* mobile drawer: opaque so the bg scrim doesn't bleed through glass; desktop keeps glass */
+.okf-drawer {
+  background: #15161e;
+}
+html.light .okf-drawer {
+  background: #f3f4f6;
+}
+@media (min-width: 768px) {
+  .okf-drawer { background: transparent; }
+  html.light .okf-drawer { background: transparent; }
+}
 
 .text-gradient {
   background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #6366f1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* ponytail: light-mode surface flips for the common white/opacity utilities */
+html.light [class*="text-gray-"] { color: #374151 !important; }
+html.light [class*="border-white"] { border-color: rgba(0,0,0,0.10) !important; }
+html.light [class*="bg-white/"] { background-color: rgba(0,0,0,0.04) !important; }
+html.light [class*="bg-white/[0"] { background-color: rgba(0,0,0,0.03) !important; }
+html.light .text-white { color: #111827 !important; }
+
+/* ponytail: respect safe-area on mobile (notch / home indicator) */
+.safe-pad { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
