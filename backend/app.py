@@ -90,6 +90,24 @@ def delete_concept(concept_id: str):
         return {"error": f"Failed to delete: {e}"}
 
 
+@app.put("/api/concepts/{concept_id}")
+async def update_concept(concept_id: str, request: Request):
+    # ponytail: overwrite the concept's .md file in place, then reload
+    body = await request.json()
+    markdown = body.get("content")
+    if markdown is None:
+        return {"error": "content required"}
+    okf_engine.load_concepts()
+    target = next((c for c in okf_engine.concepts if c["id"] == concept_id), None)
+    if not target:
+        return {"error": f"Concept '{concept_id}' not found"}
+    try:
+        with open(target["filepath"], "w", encoding="utf-8") as f:
+            f.write(markdown)
+        okf_engine.load_concepts()
+        return {"updated": concept_id}
+    except Exception as e:
+        return {"error": f"Failed to save: {e}"}
 import tempfile
 import re
 from markitdown import MarkItDown

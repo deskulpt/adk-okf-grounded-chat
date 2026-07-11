@@ -76,6 +76,9 @@ export const Chat: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') === 'light' ? 'light' : 'dark'));
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [viewConcept, setViewConcept] = useState<Concept | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [draftContent, setDraftContent] = useState('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -146,6 +149,21 @@ export const Chat: React.FC = () => {
       setSystemConcepts(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       console.warn('Failed to delete system concept:', err);
+    }
+  };
+  const saveConcept = async (concept: Concept, content: string) => {
+    try {
+      const res = await fetch(`http://localhost:8040/api/concepts/${encodeURIComponent(concept.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (data.error) { console.warn('Save failed:', data.error); return; }
+      setSystemConcepts(prev => prev.map(c => c.id === concept.id ? { ...c, content } : c));
+      setLocalConcepts(prev => prev.map(c => c.id === concept.id ? { ...c, content } : c));
+    } catch (err) {
+      console.warn('Failed to save concept:', err);
     }
   };
   const handleUrlSubmit = async (e: React.FormEvent) => {
@@ -347,6 +365,70 @@ export const Chat: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row gap-0 md:gap-6 w-full max-w-6xl mx-auto h-[100dvh] md:h-[calc(100vh-48px)] md:my-4 px-0 md:px-4 select-none safe-pad">
+      {viewConcept && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+          <div className="glassmorphism okf-drawer rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 relative animate-fade-in">
+            <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (viewConcept.id.startsWith('session/')) {
+                    setLocalConcepts(prev => prev.filter(c => c.id !== viewConcept.id));
+                  } else {
+                    await removeSystemConcept(viewConcept.id);
+                  }
+                  setViewConcept(null); setEditMode(false);
+                }}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer border-0 shrink-0"
+                title="Delete concept"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+              <h3 className="text-sm font-bold text-white tracking-wide truncate m-0 flex-1 min-w-0">{viewConcept.title}</h3>
+              <button
+                type="button"
+                onClick={() => { setEditMode(e => !e); if (!editMode) setDraftContent(viewConcept.content); }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 cursor-pointer shrink-0"
+              >
+                {editMode ? 'Preview' : 'Edit'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setViewConcept(null); setEditMode(false); }}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border-0 shrink-0"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-5">
+              {editMode ? (
+                <textarea
+                  value={draftContent}
+                  onChange={(e) => setDraftContent(e.target.value)}
+                  className="w-full h-full min-h-[300px] resize-none bg-black/20 border border-white/10 rounded-xl p-3 text-xs text-gray-200 font-mono leading-relaxed focus:outline-none focus:border-indigo-500/50"
+                  spellCheck={false}
+                />
+              ) : (
+                <div className="text-sm text-gray-200 leading-relaxed markdown-body">
+                  <Markdown content={viewConcept.content} onLinkClick={(val) => { setViewConcept(null); setInput(val); }} />
+                </div>
+              )}
+            </div>
+            {editMode && (
+              <button
+                type="button"
+                onClick={async () => { await saveConcept(viewConcept, draftContent); setEditMode(false); setViewConcept({ ...viewConcept, content: draftContent }); }}
+                className="absolute bottom-4 right-4 p-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 transition-colors cursor-pointer border-0"
+                title="Save and close"
+              >
+                <CheckCircle className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {/* Sidebar - Catalog Explorer & File Uploads (mobile fly-out drawer) */}
       {showSidebar && (
         <>
@@ -492,7 +574,7 @@ export const Chat: React.FC = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => setInput(concept.id)}
+                        onClick={() => { setViewConcept(concept); setEditMode(false); setDraftContent(concept.content); }}
                         className="flex-1 text-left px-1 py-0.5 flex items-start gap-2.5 min-w-0 bg-transparent border-0 cursor-pointer"
                       >
                         <FileText className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
@@ -536,7 +618,7 @@ export const Chat: React.FC = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => setInput(concept.id)}
+                        onClick={() => { setViewConcept(concept); setEditMode(false); setDraftContent(concept.content); }}
                         className="flex-1 text-left px-1 py-0.5 flex items-start gap-2.5 min-w-0 bg-transparent border-0 cursor-pointer"
                       >
                         <FileText className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
