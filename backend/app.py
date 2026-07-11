@@ -305,20 +305,40 @@ def _okf_sentences(text: str) -> list:
     return [c.strip(" \n-#*") for c in chunks if c.strip()]
 
 
-def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500) -> str:
+def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500, seen: "set | None" = None) -> str:
     """Local, LLM-free extractive synthesis for pure-OKF mode.
     ponytail: keyword-overlap extraction only - no semantic understanding.
     Upgrade: route grounding context through LLM with no fallback for true synthesis."""
+    seen = seen or set()
+    # ponytail: rotate phrasings by index so consecutive follow-ups vary;
+    # seen-set (from prior turns) is dropped so questions never repeat as context evolves.
+    HEAD_FU = [
+        lambda h: f"What's covered under '{h}'?",
+        lambda h: f"Can you explain '{h}' in more detail?",
+        lambda h: f"How does '{h}' work?",
+        lambda h: f"Tell me more about '{h}'.",
+    ]
+    TITLE_FU = [
+        lambda t: f"Tell me more about {t}.",
+        lambda t: f"What else can you share about {t}?",
+    ]
     query_terms = {t for t in re.findall(r'[a-zA-Z0-9_]+', query.lower()) if len(t) > 3}
     blocks, followups = [], []
+    fi = 0
     for c in matched_concepts:
         content = c.get("content", "")
         headings = re.findall(r'^#{1,6}\s+(.+)$', content, re.MULTILINE)
         if headings:
             for h in headings[:3]:
-                followups.append(f"What's covered under '{h.strip()}'?")
+                cand = HEAD_FU[fi % len(HEAD_FU)](h.strip())
+                fi += 1
+                if cand not in seen:
+                    followups.append(cand)
         else:
-            followups.append(f"Tell me more about {c['title']}.")
+            cand = TITLE_FU[fi % len(TITLE_FU)](c['title'])
+            fi += 1
+            if cand not in seen:
+                followups.append(cand)
         sentences = _okf_sentences(content)
         relevant = [s for s in sentences if any(t in s.lower() for t in query_terms)] if query_terms else []
         chosen = relevant[:4] if relevant else sentences[:3]
@@ -331,6 +351,23 @@ def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500) ->
     if len(text) + len(fu) > max_chars:
         text = text[:max(0, max_chars - len(fu))].rsplit(" ", 1)[0].rstrip() + "…"
     return text + fu
+
+
+def _seen_followups(messages: list) -> set:
+    """ponytail: pull follow-up questions already shown in prior assistant turns."""
+    seen = set()
+    for m in messages:
+        if m.get("role") != "assistant":
+            continue
+        # lines after the "Possible follow-up:" marker are the questions
+        parts = re.split(r'\*\*Possible follow-up:\*\*', m.get("content", ""), maxsplit=1)
+        if len(parts) < 2:
+            continue
+        for line in parts[1].splitlines():
+            q = line.lstrip("-* ").strip()
+            if q:
+                seen.add(q)
+    return seen
 
 
 # ponytail: offline "essential LLM" — single file-backed common-knowledge responder.
@@ -421,7 +458,7 @@ async def chat_endpoint(request: Request):
             yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': concept_title})}\n\n"
             
             if pure_okf:
-                synthesized = synthesize_okf(matched_concepts, user_query)
+                synthesized = synthesize_okf(matched_concepts, user_query, seen=_seen_followups(messages))
                 chunk_size = 80
                 for i in range(0, len(synthesized), chunk_size):
                     chunk = synthesized[i:i+chunk_size]
@@ -434,11 +471,18 @@ async def chat_endpoint(request: Request):
             common = _get_common_concept()
             if _match_common(user_query, common):
                 print("Common-knowledge match (no AI, no grounding).")
-                synthesized = synthesize_okf([common], user_query)
+                synthesized = synthesize_okf([common], user_query, seen=_seen_followups(messages))
                 yield f"data: {json.dumps({'text': synthesized, 'okf_match': False, 'concept': 'Common Knowledge'})}\n\n"
                 return
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
+            return
+
+        # ponytail: AI requested but no usable key -> clean message, not a 401 crash.
+        # OpenRouter keys start with "sk-or-"; placeholder "***" / empty / invalid all count as missing.
+        _usable = lambda k: bool(k) and str(k).startswith("sk-or-")
+        if not _usable(api_key) and not _usable(shared.OPENROUTER_KEY):
+            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no OpenRouter API key is set. Paste your free key in Settings (OpenRouter.ai → Keys).', 'okf_match': is_grounded})}\n\n"
             return
 
         base_instruction = get_base_persona_instructions(agent_name, agent_tone, agent_behaviors)
