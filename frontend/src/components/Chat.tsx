@@ -49,6 +49,9 @@ function extractFollowups(content: string): { body: string; followups: string[] 
   return { body, followups };
 }
 
+// ponytail: single API base; relative by default so any port works when backend serves the build. Override with VITE_API_URL.
+const API: string = (import.meta.env.VITE_API_URL as string) || '';
+
 export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -138,14 +141,14 @@ export const Chat: React.FC = () => {
   };
 
   useEffect(() => {
-    fetch('http://localhost:8040/api/concepts')
+    fetch(API + '/api/concepts')
       .then(res => res.json())
       .then(data => setSystemConcepts(data.concepts || []))
       .catch(err => console.warn('Failed to load system concepts:', err));
   }, []);
   const removeSystemConcept = async (id: string) => {
     try {
-      await fetch(`http://localhost:8040/api/concepts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await fetch(`${API}/api/concepts/${encodeURIComponent(id)}`, { method: 'DELETE' });
       setSystemConcepts(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       console.warn('Failed to delete system concept:', err);
@@ -153,7 +156,7 @@ export const Chat: React.FC = () => {
   };
   const saveConcept = async (concept: Concept, content: string) => {
     try {
-      const res = await fetch(`http://localhost:8040/api/concepts/${encodeURIComponent(concept.id)}`, {
+      const res = await fetch(`${API}/api/concepts/${encodeURIComponent(concept.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -184,7 +187,7 @@ export const Chat: React.FC = () => {
     setIsThinking(true);
 
     try {
-      const res = await fetch("http://localhost:8040/api/convert_url", {
+      const res = await fetch(`${API}/api/convert_url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: targetUrl })
@@ -227,7 +230,7 @@ export const Chat: React.FC = () => {
     const updatedMessages = [...messages, userMessage];
 
     try {
-      const response = await fetch('http://localhost:8040/api/chat', {
+      const response = await fetch(`${API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -485,7 +488,7 @@ export const Chat: React.FC = () => {
                 }
                 
                 try {
-                  const res = await fetch("http://localhost:8040/api/convert", {
+                  const res = await fetch(`${API}/api/convert`, {
                     method: "POST",
                     body: formData
                   });
