@@ -649,7 +649,7 @@ export const Chat: React.FC = () => {
       {/* Main Chat Area */}
       <div className="flex flex-col flex-1 glassmorphism rounded-2xl shadow-2xl overflow-hidden border border-white/10 h-full relative">
         {showInstall && deferredPrompt && (
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-500/10 border-b border-indigo-500/20 text-xs text-gray-200 shrink-0 safe-pad">
+          <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2.5 bg-indigo-500/10 backdrop-blur border-b border-indigo-500/20 text-xs text-gray-200 shrink-0 safe-pad shadow-lg">
             <span className="flex-1 min-w-0">Install ADK OKF Agent for offline use.</span>
             <button
               type="button"
@@ -723,12 +723,12 @@ export const Chat: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap pt-3 border-t border-white/5">
             <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-indigo-300' : 'text-gray-500'}`}>Pure OKF</span>
+              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-emerald-400' : 'text-gray-500'}`}>Pure OKF</span>
               <button
                 type="button"
                 onClick={() => setPureOkf(!pureOkf)}
                 className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                  pureOkf ? 'bg-indigo-500' : 'bg-white/10'
+                  pureOkf ? 'bg-emerald-500' : 'bg-white/10'
                 }`}
                 title="Toggle between +AI API (OpenRouter) and pure OKF (no LLM) mode"
               >
@@ -738,7 +738,7 @@ export const Chat: React.FC = () => {
                   }`}
                 />
               </button>
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-indigo-300'}`}>+AI API</span>
+              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-emerald-400'}`}>+AI API</span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2.5 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
               <span className="text-[10px] md:text-[11px] font-semibold tracking-wider text-gray-400 select-none uppercase">Thinking</span>
@@ -797,7 +797,7 @@ export const Chat: React.FC = () => {
                         }`}
                       >
                         {isUser ? (
-                          <p className="whitespace-pre-wrap select-text text-left leading-relaxed">{body}</p>
+                          <p className="whitespace-pre-wrap select-text text-left leading-relaxed text-white">{body}</p>
                         ) : (
                           <Markdown content={body || '...'} onLinkClick={(val) => setInput(val)} />
                         )}
