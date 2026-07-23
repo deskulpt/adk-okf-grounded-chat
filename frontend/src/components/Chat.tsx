@@ -38,6 +38,25 @@ const ThinkingBlock: React.FC<{ thinking: string }> = ({ thinking }) => {
   );
 };
 
+// ponytail: reusable toggle switch; same shape used for Pure OKF and Thinking toggles
+const Toggle: React.FC<{ checked: boolean; onChange: () => void; labelLeft: string; labelRight: string; title?: string }> = ({ checked, onChange, labelLeft, labelRight, title }) => (
+  <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner" title={title}>
+    <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${checked ? 'text-gray-500' : 'text-emerald-400'}`}>{labelLeft}</span>
+    <button
+      type="button"
+      onClick={onChange}
+      className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${checked ? 'bg-emerald-500' : 'bg-white/10'}`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-3.5 w-3.5 md:h-4.5 md:w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+          checked ? 'translate-x-3.5 md:translate-x-4.5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+    <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${checked ? 'text-emerald-400' : 'text-gray-500'}`}>{labelRight}</span>
+  </div>
+);
+
 // ponytail: pull pure-OKF "Possible follow-up" bullets out so they render as clickable chips, not markdown text
 function extractFollowups(content: string): { body: string; followups: string[] } {
   const marker = '**Possible follow-up:**';
@@ -201,7 +220,7 @@ export const Chat: React.FC = () => {
         });
         setUrlInput('');
       }
-    } catch (err) {
+    } catch {
       setUrlError("Failed to convert URL page content.");
     } finally {
       setIsThinking(false);
@@ -500,7 +519,7 @@ export const Chat: React.FC = () => {
                       return [...filtered, data];
                     });
                   }
-                } catch (err) {
+                } catch {
                   setUploadError("Failed to convert file on backend.");
                 } finally {
                   setIsThinking(false);
@@ -722,41 +741,20 @@ export const Chat: React.FC = () => {
           </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap pt-3 border-t border-white/5">
-            <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-emerald-400' : 'text-gray-500'}`}>Pure OKF</span>
-              <button
-                type="button"
-                onClick={() => setPureOkf(!pureOkf)}
-                className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                  pureOkf ? 'bg-emerald-500' : 'bg-white/10'
-                }`}
-                title="Toggle between +AI API (OpenRouter) and pure OKF (no LLM) mode"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-3.5 w-3.5 md:h-4.5 md:w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    pureOkf ? 'translate-x-3.5 md:translate-x-4.5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-              <span className={`text-[10px] md:text-[11px] font-semibold tracking-wide uppercase select-none transition-colors ${pureOkf ? 'text-gray-500' : 'text-emerald-400'}`}>+AI API</span>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-2.5 px-2 md:px-3 py-1 md:py-1.5 rounded-xl bg-white/[0.02] border border-white/10 shadow-inner">
-              <span className="text-[10px] md:text-[11px] font-semibold tracking-wider text-gray-400 select-none uppercase">Thinking</span>
-              <button
-                type="button"
-                onClick={() => setShowThinking(!showThinking)}
-                className={`relative inline-flex h-5 w-9 md:h-5.5 md:w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                  showThinking ? 'bg-indigo-500' : 'bg-white/10'
-                }`}
-                title="Display cognitive reasoning traces"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-3.5 w-3.5 md:h-4.5 md:w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    showThinking ? 'translate-x-3.5 md:translate-x-4.5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
+            <Toggle
+              checked={pureOkf}
+              onChange={() => setPureOkf(!pureOkf)}
+              labelLeft="Pure OKF"
+              labelRight="+AI API"
+              title="Toggle between +AI API (OpenRouter) and pure OKF (no LLM) mode"
+            />
+            <Toggle
+              checked={showThinking}
+              onChange={() => setShowThinking(!showThinking)}
+              labelLeft="Thinking"
+              labelRight=""
+              title="Display cognitive reasoning traces"
+            />
           </div>
       </div>
 
