@@ -479,10 +479,13 @@ async def chat_endpoint(request: Request):
             return
 
         # ponytail: AI requested but no usable key -> clean message, not a 401 crash.
-        # OpenRouter keys start with "sk-or-"; placeholder "***" / empty / invalid all count as missing.
-        _usable = lambda k: bool(k) and str(k).startswith("sk-or-")
-        if not _usable(api_key) and not _usable(shared.OPENROUTER_KEY):
-            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no OpenRouter API key is set. Paste your free key in Settings (OpenRouter.ai → Keys).', 'okf_match': is_grounded})}\n\n"
+        # Accept either a Gemini AI Studio key (AIzaSy...) or an OpenRouter key (sk-or-...).
+        def _usable_gemini(k):
+            return bool(k) and str(k).startswith("AIzaSy")
+        def _usable_openrouter(k):
+            return bool(k) and str(k).startswith("sk-or-")
+        if not (_usable_gemini(api_key) or _usable_openrouter(api_key) or _usable_gemini(shared.GEMINI_KEY) or _usable_openrouter(shared.OPENROUTER_KEY)):
+            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set. Add GEMINI_API_KEY to backend/.env or paste an OpenRouter key in Settings.', 'okf_match': is_grounded})}\n\n"
             return
 
         base_instruction = get_base_persona_instructions(agent_name, agent_tone, agent_behaviors)
@@ -516,20 +519,30 @@ async def chat_endpoint(request: Request):
             agent.instruction = base_instruction
 
         import litellm
-        if api_key:
-            if api_key.startswith("AIzaSy"):
-                print("Using Google AI Studio API Key.")
-                agent.model = "gemini/gemini-2.5-flash"
-                os.environ["GEMINI_API_KEY"] = api_key
-                litellm.api_key = api_key
-            else:
-                print("Using custom OpenRouter API Key.")
-                agent.model = "litellm:openrouter/google/gemini-2.5-flash"
-                litellm.api_key = api_key
-        else:
-            print("Using default OpenRouter free preset.")
-            agent.model = shared.DEFAULT_MODEL
+        # Route: explicit key > env key; Gemini AI Studio > OpenRouter.
+        if _usable_gemini(api_key):
+            print("Using user Gemini API Key.")
+            agent.model = "gemini/gemini-2.5-flash"
+            os.environ["GEMINI_API_KEY"] = api_key
+            litellm.api_key = api_key
+        elif _usable_openrouter(api_key):
+            print("Using user OpenRouter API Key.")
+            agent.model = "litellm:openrouter/google/gemini-2.5-flash"
+            litellm.api_base = "https://openrouter.ai/api/v1"
+            litellm.api_key = api_key
+        elif _usable_gemini(shared.GEMINI_KEY):
+            print("Using env GEMINI_API_KEY.")
+            agent.model = "gemini/gemini-2.5-flash"
+            litellm.api_key = shared.GEMINI_KEY
+        elif _usable_openrouter(shared.OPENROUTER_KEY):
+            print("Using env OPENROUTER_API_KEY.")
+            agent.model = "litellm:openrouter/google/gemini-2.5-flash"
+            litellm.api_base = "https://openrouter.ai/api/v1"
             litellm.api_key = shared.OPENROUTER_KEY
+        else:
+            # Should be unreachable because of the guard above, but keep safe.
+            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set.', 'okf_match': is_grounded})}\n\n"
+            return
             
         print(f"Routing to LLM for query: '{user_query}' using model '{agent.model}' (Grounded: {is_grounded})")
         session = await session_service.create_session(
