@@ -453,11 +453,11 @@ async def chat_endpoint(request: Request):
         is_grounded = len(matched_concepts) > 0
         concept_title = ", ".join(c['title'] for c in matched_concepts) if is_grounded else ""
         
-        if is_grounded:
-            print(f"OKF Grounded Matches: {concept_title}")
-            yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': concept_title})}\n\n"
-            
-            if pure_okf:
+        if pure_okf:
+            # ponytail: Pure OKF never touches an LLM, regardless of use_ai or key state.
+            if is_grounded:
+                print(f"OKF Grounded Matches: {concept_title}")
+                yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': concept_title})}\n\n"
                 synthesized = synthesize_okf(matched_concepts, user_query, seen=_seen_followups(messages))
                 chunk_size = 80
                 for i in range(0, len(synthesized), chunk_size):
@@ -465,6 +465,19 @@ async def chat_endpoint(request: Request):
                     yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': concept_title})}\n\n"
                     await asyncio.sleep(0.01)
                 return
+            else:
+                common = _get_common_concept()
+                if _match_common(user_query, common):
+                    print("Common-knowledge match (pure OKF).")
+                    synthesized = synthesize_okf([common], user_query, seen=_seen_followups(messages))
+                    yield f"data: {json.dumps({'text': synthesized, 'okf_match': False, 'concept': 'Common Knowledge'})}\n\n"
+                    return
+                yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found in Pure OKF mode.', 'okf_match': False})}\n\n"
+                return
+        
+        if is_grounded:
+            print(f"OKF Grounded Matches: {concept_title}")
+            yield f"data: {json.dumps({'text': '', 'okf_match': True, 'concept': concept_title})}\n\n"
             
         if not use_ai and not is_grounded:
             # ponytail: offline "essential LLM" — answer common queries without AI/grounding
@@ -479,13 +492,13 @@ async def chat_endpoint(request: Request):
             return
 
         # ponytail: AI requested but no usable key -> clean message, not a 401 crash.
-        # Accept either a Gemini AI Studio key (AIzaSy...) or an OpenRouter key (sk-or-...).
+        # Only use keys explicitly supplied by the user; never auto-use an budget-exceeded env key.
         def _usable_gemini(k):
             return bool(k) and str(k).startswith("AIzaSy")
         def _usable_openrouter(k):
             return bool(k) and str(k).startswith("sk-or-")
-        if not (_usable_gemini(api_key) or _usable_openrouter(api_key) or _usable_gemini(shared.GEMINI_KEY) or _usable_openrouter(shared.OPENROUTER_KEY)):
-            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set. Add GEMINI_API_KEY to backend/.env or paste an OpenRouter key in Settings.', 'okf_match': is_grounded})}\n\n"
+        if not (_usable_gemini(api_key) or _usable_openrouter(api_key)):
+            yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set. Paste a Gemini AI Studio or OpenRouter key in Settings.', 'okf_match': is_grounded})}\n\n"
             return
 
         base_instruction = get_base_persona_instructions(agent_name, agent_tone, agent_behaviors)
@@ -519,10 +532,11 @@ async def chat_endpoint(request: Request):
             agent.instruction = base_instruction
 
         import litellm
-        # Route: explicit key > env key; Gemini AI Studio > OpenRouter.
+        # Route: only user-supplied keys; never env keys.
         if _usable_gemini(api_key):
             print("Using user Gemini API Key.")
             agent.model = "gemini/gemini-2.5-flash"
+            litellm.api_base = "https://generativelanguage.googleapis.com/v1beta/openai/"
             os.environ["GEMINI_API_KEY"] = api_key
             litellm.api_key = api_key
         elif _usable_openrouter(api_key):
@@ -530,15 +544,6 @@ async def chat_endpoint(request: Request):
             agent.model = "litellm:openrouter/google/gemini-2.5-flash"
             litellm.api_base = "https://openrouter.ai/api/v1"
             litellm.api_key = api_key
-        elif _usable_gemini(shared.GEMINI_KEY):
-            print("Using env GEMINI_API_KEY.")
-            agent.model = "gemini/gemini-2.5-flash"
-            litellm.api_key = shared.GEMINI_KEY
-        elif _usable_openrouter(shared.OPENROUTER_KEY):
-            print("Using env OPENROUTER_API_KEY.")
-            agent.model = "litellm:openrouter/google/gemini-2.5-flash"
-            litellm.api_base = "https://openrouter.ai/api/v1"
-            litellm.api_key = shared.OPENROUTER_KEY
         else:
             # Should be unreachable because of the guard above, but keep safe.
             yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set.', 'okf_match': is_grounded})}\n\n"
