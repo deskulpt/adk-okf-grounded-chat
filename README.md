@@ -13,6 +13,7 @@ This repository implements a full-stack, local-first developer sandbox featuring
   <img src="https://img.shields.io/badge/FastAPI-0.111%2B-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
+  <a href="https://bundledex.net"><img src="https://bundledex.net/static-badge.svg" alt="OKF BundleDex" /></a>
 </p>
 
 ---
