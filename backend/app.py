@@ -592,6 +592,13 @@ async def chat_endpoint(request: Request):
                     yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': concept_title})}\n\n"
                     await asyncio.sleep(0.01)
                 return
+            # ponytail: before giving up for lack of a key, answer common queries from the local common-knowledge doc.
+            common = _get_common_concept()
+            if _match_common(user_query, common):
+                print("Common-knowledge match (AI mode, no key).")
+                synthesized = synthesize_okf([common], user_query, seen=_seen_followups(messages))
+                yield f"data: {json.dumps({'text': synthesized, 'okf_match': False, 'concept': 'Common Knowledge'})}\n\n"
+                return
             yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set. Paste a Gemini AI Studio or OpenRouter key in Settings.', 'okf_match': is_grounded})}\n\n"
             return
 
