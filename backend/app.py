@@ -471,6 +471,44 @@ def _get_common_concept() -> dict:
         _common_concept = {"id": "system/common_knowledge", "title": "Common Knowledge", "content": content, "type": "common"}
     return _common_concept
 
+
+
+def _recent_concept_ids(messages: list) -> list:
+    """ponytail: collect concept IDs cited in recent assistant turns (from 'concept' field or title mentions)."""
+    ids = []
+    for m in messages[-4:]:
+        if m.get("role") != "assistant":
+            continue
+        # If backend emitted a concept marker, it may be stored in a hidden field by the client.
+        # We also scan for bolded titles that look like concept names.
+        ids.append(m.get("concept", ""))
+        # Strip markdown bold and collect lines that look like concept headers
+        for line in m.get("content", "").splitlines():
+            for match in re.finditer(r"\*\*([^*]+)\*\*", line):
+                ids.append(match.group(1).strip())
+    return [i for i in ids if i]
+
+
+def _expand_query_with_context(user_query: str, recent_ids: list, local_concepts: list) -> str:
+    """ponytail: if the query uses pronouns/short references, append recent concept titles to disambiguate."""
+    qlower = user_query.lower()
+    # pronouns or very short queries signal need for context
+    if len(qlower.split()) <= 3 or any(w in qlower for w in ["it", "its", "they", "them", "their", "this", "that", "these", "those", "what", "which"]):
+        # Build a map from id/title to concept
+        title_map = {}
+        for c in local_concepts:
+            title_map[c["id"].lower()] = c
+            title_map[c.get("title", "").lower()] = c
+        expanded_terms = []
+        for rid in recent_ids:
+            c = title_map.get(rid.lower())
+            if c:
+                expanded_terms.append(c.get("title", rid))
+        if expanded_terms:
+            return f"{user_query} ({', '.join(expanded_terms)})"
+    return user_query
+
+
 def _match_common(query: str, concept: dict) -> bool:
     qterms = {t for t in re.findall(r"[a-zA-Z0-9_]+", query.lower()) if len(t) > 2}
     if not qterms:
@@ -500,10 +538,14 @@ async def chat_endpoint(request: Request):
     # Reload concepts dynamically on incoming request to ensure fresh index
     okf_engine.load_concepts()
     
+    # ponytail: conversation-aware query expansion
+    recent_ids = _recent_concept_ids(messages)
+    expanded_query = _expand_query_with_context(user_query, recent_ids, local_concepts)
+    
     # Match multiple concepts
     import re
     matched_concepts = []
-    query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', user_query.lower()))
+    query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', expanded_query.lower()))
     
     # 1. Match local client-uploaded concepts
     for c in local_concepts:
@@ -516,7 +558,7 @@ async def chat_endpoint(request: Request):
             matched_concepts.append(c)
             
     # 2. Match system concepts
-    system_matches = okf_engine.match_concepts(user_query) if use_system_grounding else []
+    system_matches = okf_engine.match_concepts(expanded_query) if use_system_grounding else []
     existing_ids = {c['id'] for c in matched_concepts}
     for c in system_matches:
         if c.get("type") in ("persona", "instruction"):
@@ -533,6 +575,26 @@ async def chat_endpoint(request: Request):
             if c['id'] not in existing_ids:
                 matched_concepts.append(c)
                 existing_ids.add(c['id'])
+    
+    # 4. Conversation continuity: boost recently matched concepts if the current query is short/ambiguous
+    recent_local = {c["id"]: c for c in local_concepts}
+    for rid in recent_ids:
+        if rid in recent_local:
+            c = recent_local[rid]
+            if c.get("type") not in ("persona", "instruction") and c["id"] not in existing_ids:
+                matched_concepts.append(c)
+                existing_ids.add(c["id"])
+    
+    # 5. Cross-reference: include system concepts related to currently matched system concepts
+    if use_system_grounding:
+        matched_system_ids = [c["id"] for c in matched_concepts if c.get("source") != "local"]
+        for rid in okf_engine.related_concepts(matched_system_ids, top_n=3):
+            if rid not in existing_ids:
+                for c in okf_engine.concepts:
+                    if c["id"] == rid and c.get("type") not in ("persona", "instruction"):
+                        matched_concepts.append(c)
+                        existing_ids.add(rid)
+                        break
 
     async def sse_generator():
         is_grounded = len(matched_concepts) > 0

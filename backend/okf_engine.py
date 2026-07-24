@@ -5,11 +5,63 @@ import yaml
 # Resolve path to okf_knowledge/ directory (located at project root)
 OKF_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "okf_knowledge"))
 
+# ponytail: shared stop words for tokenization; keep small, no NLP dep.
+_STOP = {"the", "and", "for", "with", "this", "that", "from", "into", "your",
+         "are", "was", "have", "has", "will", "not", "but", "all", "can",
+         "data", "table", "column", "value", "each", "item", "type", "name",
+         "list", "used", "use", "using", "field", "fields", "when", "then",
+         "what", "how", "why", "who", "where", "which", "does", "did", "do",
+         "about", "they", "them", "their", "there", "than", "only", "some",
+         "any", "should", "would", "could", "may", "might"}
+
+
+def _tokens(s: str) -> set:
+    raw = {t for t in re.findall(r'[a-zA-Z0-9_]+', s.lower()) if t not in _STOP}
+    short = {t for t in re.findall(r'\b[a-zA-Z0-9_]{2,}\b', s.lower()) if t not in _STOP and len(t) <= 3}
+    return raw | short
+
+
+# Resolve path to okf_knowledge/ directory (located at project root)
+
 class OKFEngine:
     def __init__(self, directory=OKF_DIR):
         self.directory = directory
         self.concepts = []
+        self._token_to_concepts: dict[str, set] = {}
         self.load_concepts()
+        self._build_index()
+
+    def _build_index(self):
+        """ponytail: inverted token index for cross-referencing related concepts."""
+        self._token_to_concepts = {}
+        for c in self.concepts:
+            if c.get("type") in ("persona", "instruction"):
+                continue
+            for t in self._concept_tokens(c):
+                self._token_to_concepts.setdefault(t, set()).add(c["id"])
+
+    def _concept_tokens(self, concept: dict) -> set:
+        text = " ".join([
+            str(concept.get("id", "")),
+            str(concept.get("title", "")),
+            " ".join(str(t) for t in concept.get("tags", [])),
+        ])
+        return _tokens(text) | set(re.split(r'[/_-]', concept.get("id", "").lower()))
+
+    def related_concepts(self, concept_ids: list[str], top_n: int = 5) -> list[str]:
+        """Return concept IDs related to any of the given concept IDs by shared tokens."""
+        related: dict[str, int] = {}
+        for cid in concept_ids:
+            # Find tokens for this concept
+            concept = next((c for c in self.concepts if c["id"] == cid), None)
+            if not concept:
+                continue
+            for t in self._concept_tokens(concept):
+                for other_id in self._token_to_concepts.get(t, set()):
+                    if other_id != cid:
+                        related[other_id] = related.get(other_id, 0) + 1
+        ranked = sorted(related.items(), key=lambda x: x[1], reverse=True)
+        return [cid for cid, _ in ranked[:top_n]]
 
     def load_concepts(self):
         self.concepts = []
