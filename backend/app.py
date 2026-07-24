@@ -490,18 +490,20 @@ def _recent_concept_titles(messages: list) -> list:
 
 
 def _expand_query_with_context(user_query: str, recent_titles: list, local_concepts: list) -> str:
-    """ponytail: if the query uses pronouns/short references, append recent concept titles to disambiguate."""
+    """ponytail: only expand when the query uses a pronoun/short reference to a prior topic."""
     qlower = user_query.lower()
-    # pronouns or very short queries signal need for context
-    pronouns = {"it", "its", "they", "them", "their", "this", "that", "these", "those"}
-    if len(qlower.split()) <= 3 or any(w in qlower.split() for w in pronouns):
-        local_titles = {c.get("title", "").lower(): c for c in local_concepts}
-        expanded_terms = []
-        for title in recent_titles:
-            if title.lower() in local_titles:
-                expanded_terms.append(title)
-        if expanded_terms:
-            return f"{user_query} ({', '.join(expanded_terms)})"
+    pronouns = {"it", "its", "they", "them", "their", "this", "that", "these", "those", "he", "she"}
+    words = qlower.split()
+    # Only expand if the user is clearly referring to something earlier
+    if not any(w in words for w in pronouns):
+        return user_query
+    local_titles = {c.get("title", "").lower(): c for c in local_concepts}
+    expanded_terms = []
+    for title in recent_titles:
+        if title.lower() in local_titles:
+            expanded_terms.append(title)
+    if expanded_terms:
+        return f"{user_query} ({', '.join(expanded_terms)})"
     return user_query
 
 
@@ -583,13 +585,17 @@ async def chat_endpoint(request: Request):
     # 5. Cross-reference: include system concepts related to currently matched system concepts
     if use_system_grounding:
         matched_system_ids = [c["id"] for c in matched_concepts if c not in local_concepts]
-        for rid in okf_engine.related_concepts(matched_system_ids, top_n=3):
-            if rid not in existing_ids:
-                for c in okf_engine.concepts:
-                    if c["id"] == rid and c.get("type") not in ("persona", "instruction"):
-                        matched_concepts.append(c)
-                        existing_ids.add(rid)
-                        break
+        # ponytail: only cross-reference when there are no strong local matches, to avoid pulling
+        # unrelated system docs into a locally-grounded question.
+        local_ids = {c["id"] for c in local_concepts}
+        if not any(c["id"] in local_ids for c in matched_concepts):
+            for rid in okf_engine.related_concepts(matched_system_ids, top_n=2):
+                if rid not in existing_ids:
+                    for c in okf_engine.concepts:
+                        if c["id"] == rid and c.get("type") not in ("persona", "instruction"):
+                            matched_concepts.append(c)
+                            existing_ids.add(rid)
+                            break
 
     async def sse_generator():
         is_grounded = len(matched_concepts) > 0
