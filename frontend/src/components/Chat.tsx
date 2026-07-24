@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, CheckCircle, RefreshCw, Settings, X, BookOpen, Upload, Lock, FileText, Globe, Plus, Trash2, ChevronDown, Sun, Moon } from 'lucide-react';
+import { DocsModal } from './DocsModal';
 import { Markdown } from './Markdown';
 
 // ponytail: PWA install event type (not in standard TS lib yet)
@@ -117,6 +118,7 @@ export const Chat: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', onPrompt);
   }, []);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [activeTab, setActiveTab] = useState<'key' | 'profile' | 'guide'>('key');
   const [agentName, setAgentName] = useState(() => localStorage.getItem('agent_name') || 'Antigravity Grounding Core');
@@ -717,6 +719,14 @@ export const Chat: React.FC = () => {
                   <BookOpen className="w-4.5 h-4.5 text-indigo-400" />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setShowDocs(true)}
+                className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors border border-white/10"
+                title="Documentation & Credits"
+              >
+                <BookOpen className="w-4 h-4" />
+              </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors border border-white/10"
@@ -880,6 +890,8 @@ export const Chat: React.FC = () => {
       </form>
 
       {/* Settings Modal */}
+      {showDocs && <DocsModal open={showDocs} onClose={() => setShowDocs(false)} />}
+
       {showSettings && (
         <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 transition-all duration-300">
           <div className="surface-solid rounded-2xl w-full max-w-lg shadow-2xl border border-white/10 flex flex-col relative z-[71] overflow-hidden text-left">
