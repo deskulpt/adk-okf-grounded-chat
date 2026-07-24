@@ -90,7 +90,10 @@ export const Chat: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [pureOkf, setPureOkf] = useState(() => localStorage.getItem('pure_okf') === 'true');
+  const [pureOkf, setPureOkf] = useState(() => {
+    const stored = localStorage.getItem('pure_okf');
+    return stored === null ? true : stored === 'true';
+  });
   const [showThinking, setShowThinking] = useState(() => localStorage.getItem('show_thinking') === 'true');
   const [useSystemGrounding, setUseSystemGrounding] = useState(() => localStorage.getItem('use_system_grounding') !== 'false');
   const [sysOpen, setSysOpen] = useState(true);

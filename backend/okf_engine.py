@@ -107,27 +107,24 @@ class OKFEngine:
 
     def match_concepts(self, query: str) -> list:
         """
-        Scan loaded concepts and return all matching concepts.
-        Matches if any words in the query overlap with the concept's ID, title, or tags.
-        ponytail: also co-locates related docs by shared body tokens (1-hop), so a
-        query hitting one doc pulls its join-related siblings (e.g. revenue report
-        also drags in sales/products). ceiling: O(n^2) token overlap; fine for <100
-        docs, build an inverted index if the corpus scales.
+        Scan loaded concepts and return the best matching concepts.
+        Scores by overlap of query terms with id, title, and tags.
+        Returns top 3 matches to keep responses focused.
         """
-        # ponytail: stopwords + short tokens ignored so generic schema words
-        # (table, data, id) don't glue unrelated docs together.
         STOP = {"the", "and", "for", "with", "this", "that", "from", "into", "your",
                 "are", "was", "have", "has", "will", "not", "but", "all", "can",
                 "data", "table", "column", "value", "each", "item", "type", "name",
                 "list", "used", "use", "using", "field", "fields", "when", "then"}
         def _tokens(s):
-            return {t for t in re.findall(r'[a-zA-Z0-9_]{4,}', s.lower()) if t not in STOP}
+            raw = {t for t in re.findall(r'[a-zA-Z0-9_]+', s.lower()) if t not in STOP}
+            short = {t for t in re.findall(r'\b[a-zA-Z0-9_]{2,}\b', s.lower()) if t not in STOP and len(t) <= 3}
+            return raw | short
 
         query_words = _tokens(query)
         if not query_words:
             return []
 
-        matched = []
+        scored = []
         for concept in self.concepts:
             if concept.get("type") in ("persona", "instruction"):
                 continue
@@ -135,24 +132,23 @@ class OKFEngine:
             title_words = set(re.findall(r'[a-zA-Z0-9]+', concept['title'].lower()))
             tag_words = {tag.lower() for tag in concept['tags']}
 
-            if (id_parts.intersection(query_words) or
-                title_words.intersection(query_words) or
-                tag_words.intersection(query_words)):
-                matched.append(concept)
+            score = 0
+            id_hits = id_parts & query_words
+            title_hits = title_words & query_words
+            tag_hits = tag_words & query_words
 
-        if matched:
-            seeds = {c['id'] for c in matched}
-            for concept in self.concepts:
-                if concept['id'] in seeds or concept.get("type") in ("persona", "instruction"):
-                    continue
-                cbody = _tokens(concept['content'])
-                for m in matched:
-                    mbody = _tokens(m['content'])
-                    if len(cbody & mbody) >= 4:  # shared >=4 real terms => related
-                        matched.append(concept)
-                        seeds.add(concept['id'])
-                        break
-        return matched
+            if id_hits:
+                score += len(id_hits) * 10
+            if title_hits:
+                score += len(title_hits) * 5
+            if tag_hits:
+                score += len(tag_hits) * 3
+
+            if score > 0:
+                scored.append((score, concept))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [c for _, c in scored[:3]]
 
 
 if __name__ == "__main__":
