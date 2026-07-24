@@ -553,16 +553,21 @@ async def chat_endpoint(request: Request):
         title_words = set(re.findall(r'[a-zA-Z0-9]+', c.get('title', '').lower()))
         tag_words = {t.lower() for t in c.get('tags', [])}
         if id_parts.intersection(query_words) or title_words.intersection(query_words) or tag_words.intersection(query_words):
-            matched_concepts.append(c)
-            
-    # 2. Match system concepts
-    system_matches = okf_engine.match_concepts(expanded_query) if use_system_grounding else []
-    existing_ids = {c['id'] for c in matched_concepts}
-    for c in system_matches:
-        if c.get("type") in ("persona", "instruction"):
-            continue
-        if c['id'] not in existing_ids:
-            matched_concepts.append(c)
+            # ponytail: tag local source so downstream guards can identify local matches.
+            tagged = {**c, "source": "local"}
+            matched_concepts.append(tagged)
+    # 2. Match system concepts (only when no strong local grounding exists)
+    if not any(c.get("source") == "local" for c in matched_concepts):
+        system_matches = okf_engine.match_concepts(expanded_query) if use_system_grounding else []
+        existing_ids = {c['id'] for c in matched_concepts}
+        for c in system_matches:
+            if c.get("type") in ("persona", "instruction"):
+                continue
+            if c['id'] not in existing_ids:
+                matched_concepts.append(c)
+                existing_ids.add(c['id'])
+    else:
+        existing_ids = {c['id'] for c in matched_concepts}
             
     # 3. Aggregate query match: If query asks to summarize/compare all documents, include all uploaded files
     query_lower = user_query.lower()
@@ -571,7 +576,7 @@ async def chat_endpoint(request: Request):
             if c.get("type") in ("persona", "instruction"):
                 continue
             if c['id'] not in existing_ids:
-                matched_concepts.append(c)
+                matched_concepts.append({**c, "source": "local"})
                 existing_ids.add(c['id'])
     
     # 4. Conversation continuity: boost recently matched concepts if the current query is short/ambiguous
@@ -579,16 +584,15 @@ async def chat_endpoint(request: Request):
     for title in recent_titles:
         c = recent_local_by_title.get(title.lower())
         if c and c.get("type") not in ("persona", "instruction") and c["id"] not in existing_ids:
-            matched_concepts.append(c)
+            matched_concepts.append({**c, "source": "local"})
             existing_ids.add(c["id"])
     
     # 5. Cross-reference: include system concepts related to currently matched system concepts
     if use_system_grounding:
-        matched_system_ids = [c["id"] for c in matched_concepts if c not in local_concepts]
+        matched_system_ids = [c["id"] for c in matched_concepts if c.get("source") != "local"]
         # ponytail: only cross-reference when there are no strong local matches, to avoid pulling
         # unrelated system docs into a locally-grounded question.
-        local_ids = {c["id"] for c in local_concepts}
-        if not any(c["id"] in local_ids for c in matched_concepts):
+        if not any(c.get("source") == "local" for c in matched_concepts):
             for rid in okf_engine.related_concepts(matched_system_ids, top_n=2):
                 if rid not in existing_ids:
                     for c in okf_engine.concepts:
