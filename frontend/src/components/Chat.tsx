@@ -90,6 +90,7 @@ export const Chat: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  // ponytail: always default to Pure OKF on fresh load; localStorage only overrides after explicit toggle.
   const [pureOkf, setPureOkf] = useState(() => {
     const stored = localStorage.getItem('pure_okf');
     return stored === null ? true : stored === 'true';
@@ -894,10 +895,16 @@ export const Chat: React.FC = () => {
 
       {/* Token counter */}
       <div className="px-4 pb-2 flex items-center justify-between text-[10px] text-gray-500">
-        <span>{(() => {
-          const text = [...messages.map(m => m.content), input].join(' ');
-          return `Tokens: ${Math.ceil(text.length / 4)} chars (${text.length})`;
-        })()}</span>
+        <span>
+          {pureOkf ? (
+            'Local grounding (no AI tokens)'
+          ) : (
+            (() => {
+              const text = [...messages.map(m => m.content), input].join(' ');
+              return `AI tokens ≈ ${Math.ceil(text.length / 4)} (${text.length} chars)`;
+            })()
+          )}
+        </span>
         <span>{pureOkf ? 'Pure OKF' : 'AI fallback'}</span>
       </div>
 
