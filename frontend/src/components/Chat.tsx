@@ -892,6 +892,15 @@ export const Chat: React.FC = () => {
         </div>
       </form>
 
+      {/* Token counter */}
+      <div className="px-4 pb-2 flex items-center justify-between text-[10px] text-gray-500">
+        <span>{(() => {
+          const text = [...messages.map(m => m.content), input].join(' ');
+          return `Tokens: ${Math.ceil(text.length / 4)} chars (${text.length})`;
+        })()}</span>
+        <span>{pureOkf ? 'Pure OKF' : 'AI fallback'}</span>
+      </div>
+
       {/* Settings Modal */}
       {showDocs && <DocsModal open={showDocs} onClose={() => setShowDocs(false)} />}
 

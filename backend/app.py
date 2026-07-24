@@ -490,14 +490,22 @@ async def chat_endpoint(request: Request):
             print(f"No OKF Match and use_ai is disabled. Returning notification.")
             yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found, and AI LLM fallback is currently disabled.', 'okf_match': False})}\n\n"
             return
-
-        # ponytail: AI requested but no usable key -> clean message, not a 401 crash.
+        # ponytail: AI requested but no usable key -> fall back to OKF synthesis if grounded.
         # Only use keys explicitly supplied by the user; never auto-use an budget-exceeded env key.
         def _usable_gemini(k):
             return bool(k) and str(k).startswith("AIzaSy")
         def _usable_openrouter(k):
             return bool(k) and str(k).startswith("sk-or-")
         if not (_usable_gemini(api_key) or _usable_openrouter(api_key)):
+            if is_grounded:
+                print("OKF matched; AI key missing -> returning OKF synthesis without LLM.")
+                synthesized = synthesize_okf(matched_concepts, user_query, seen=_seen_followups(messages))
+                chunk_size = 80
+                for i in range(0, len(synthesized), chunk_size):
+                    chunk = synthesized[i:i+chunk_size]
+                    yield f"data: {json.dumps({'text': chunk, 'okf_match': True, 'concept': concept_title})}\n\n"
+                    await asyncio.sleep(0.01)
+                return
             yield f"data: {json.dumps({'text': '⚠️ AI fallback is on but no API key is set. Paste a Gemini AI Studio or OpenRouter key in Settings.', 'okf_match': is_grounded})}\n\n"
             return
 
