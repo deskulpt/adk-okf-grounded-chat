@@ -261,6 +261,7 @@ export const Chat: React.FC = () => {
           messages: updatedMessages.map((m) => ({
             role: m.role,
             content: m.content,
+            concept: m.concept,
           })),
           use_ai: !pureOkf,
           pure_okf: pureOkf,
