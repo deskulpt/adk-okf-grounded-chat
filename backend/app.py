@@ -240,30 +240,81 @@ async def convert_url(request: Request):
     url = data.get("url", "").strip()
     if not url:
         return {"error": "No URL provided"}
-        
+
     if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
+
+    from urllib.parse import urljoin, urlparse
+    import urllib.request
+
+    def _fetch_text(target: str, timeout: int = 5) -> str:
+        try:
+            req = urllib.request.Request(target, headers={"User-Agent": "Mozilla/5.0 (compatible; OKF/1.0)"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read().decode("utf-8", errors="ignore")
+        except Exception as e:
+            print(f"Fetch failed for {target}: {e}")
+            return ""
+
+    def _parse_sitemap(xml_text: str, base_url: str) -> list:
+        urls = []
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml_text)
+            ns = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+            for loc in root.findall(".//ns:url/ns:loc", ns):
+                if loc.text:
+                    urls.append(loc.text.strip())
+            if not urls:
+                for loc in root.findall(".//url/loc"):
+                    if loc.text:
+                        urls.append(loc.text.strip())
+        except Exception as e:
+            print(f"Sitemap parse error: {e}")
+        return urls
+
     try:
+        # Main page via markitdown
         result = markitdown.convert(url)
         markdown_text = result.text_content
-        
-        from urllib.parse import urljoin
+
+        parsed = urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+
+        # Try llms.txt for a cleaner definition/summary
+        llms_text = _fetch_text(urljoin(base, "/llms.txt"))
+        if not llms_text and not url.endswith("/llms.txt"):
+            llms_text = _fetch_text(urljoin(url.rstrip("/"), "/llms.txt"))
+
+        # Try sitemap.xml for sub-pages
+        sitemap_text = _fetch_text(urljoin(base, "/sitemap.xml"))
+        sitemap_urls = _parse_sitemap(sitemap_text, url) if sitemap_text else []
+
         def replace_link(match):
             link_text = match.group(1)
             link_url = match.group(2)
             if not re.match(r'^(https?://|mailto:|tel:)', link_url, re.IGNORECASE):
                 return f"[{link_text}]({urljoin(url, link_url)})"
             return match.group(0)
-            
+
         markdown_text = re.sub(r'\[([^\]]*)\]\(([^)]+)\)', replace_link, markdown_text)
-        
+
+        # Compose extra context
+        extras = []
+        if llms_text:
+            extras.append("## llms.txt\n\n" + llms_text[:3000])
+        if sitemap_urls:
+            extras.append("## Sitemap Pages\n\n" + "\n".join(f"- {u}" for u in sitemap_urls[:20]))
+        if extras:
+            markdown_text = "\n\n".join(extras) + "\n\n---\n\n" + markdown_text
+
         title = url.split('/')[-1] or "webpage"
         if not title.endswith('.html'):
             title = title + ".html"
-            
+
         clean_title = re.sub(r'[^a-zA-Z0-9]', ' ', title).strip()
         tags = [t.lower() for t in clean_title.split()[:4]] + ["url", "web"]
-        
+
         okf_markdown = f"""---
 type: "Webpage Link"
 title: "{url}"
@@ -271,14 +322,15 @@ tags: {json.dumps(tags)}
 description: "Converted URL webpage: {url}"
 ---
 {markdown_text}"""
-        
+
         return {
             "id": f"session/url_{re.sub(r'[^a-zA-Z0-9]', '_', url.lower())[:50]}",
             "type": "Webpage Link",
             "title": url,
             "tags": tags,
             "description": f"Converted URL webpage: {url}",
-            "content": okf_markdown
+            "content": okf_markdown,
+            "related_urls": sitemap_urls[:20]
         }
     except Exception as e:
         print(f"Error converting URL: {e}")
@@ -322,12 +374,27 @@ def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500, se
         lambda t: f"Tell me more about {t}.",
         lambda t: f"What else can you share about {t}?",
     ]
-    query_terms = {t for t in re.findall(r'[a-zA-Z0-9_]+', query.lower()) if len(t) > 3}
+
+    # Build query terms; keep short acronyms like okf/adk
+    raw_terms = [t for t in re.findall(r"[a-zA-Z0-9_]+", query.lower()) if len(t) >= 2]
+    query_terms = {t for t in raw_terms if len(t) > 3} | {t for t in raw_terms if 2 <= len(t) <= 3}
+
     blocks, followups = [], []
     fi = 0
     for c in matched_concepts:
         content = c.get("content", "")
-        headings = re.findall(r'^#{1,6}\s+(.+)$', content, re.MULTILINE)
+        # Skip frontmatter in scoring
+        body = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, flags=re.S)
+        if not body.strip():
+            body = content
+
+        # ponytail: clean noisy webpage content (Skip to content, broken markdown links)
+        body = re.sub(r"Skip to content\s*", "", body)
+        body = re.sub(r"\]\([^)]+\)\s*", " ", body)
+        body = re.sub(r"\[([^\]]+)\]", r"\1", body)
+
+        # Generate follow-ups from headings/title
+        headings = re.findall(r'^#{1,6}\s+(.+)$', body, re.MULTILINE)
         if headings:
             for h in headings[:3]:
                 cand = HEAD_FU[fi % len(HEAD_FU)](h.strip())
@@ -339,9 +406,27 @@ def synthesize_okf(matched_concepts: list, query: str, max_chars: int = 1500, se
             fi += 1
             if cand not in seen:
                 followups.append(cand)
-        sentences = _okf_sentences(content)
-        relevant = [s for s in sentences if any(t in s.lower() for t in query_terms)] if query_terms else []
-        chosen = relevant[:4] if relevant else sentences[:3]
+
+        # Split body into paragraphs/sections, prefer ones containing query terms or definitions
+        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', body) if p.strip()]
+        scored_paras = []
+        for p in paragraphs:
+            if len(p) < 20:
+                continue
+            p_lower = p.lower()
+            score = sum(1 for t in query_terms if t in p_lower)
+            # Boost paragraphs that look like definitions/explanations
+            if any(p_lower.startswith(w) for w in ["the ", "a ", "an ", "**"]):
+                score += 0.5
+            if re.search(r"is a|are a|defined as|refers to", p_lower):
+                score += 1
+            scored_paras.append((score, p))
+
+        scored_paras.sort(key=lambda x: x[0], reverse=True)
+        chosen = [re.sub(r"\s+", " ", p).strip() for _, p in scored_paras[:2]]
+        if not chosen and paragraphs:
+            chosen = [re.sub(r"\s+", " ", paragraphs[0]).strip()]
+
         if chosen:
             blocks.append(f"**{c['title']}** — " + " ".join(chosen))
 
@@ -472,7 +557,8 @@ async def chat_endpoint(request: Request):
                     synthesized = synthesize_okf([common], user_query, seen=_seen_followups(messages))
                     yield f"data: {json.dumps({'text': synthesized, 'okf_match': False, 'concept': 'Common Knowledge'})}\n\n"
                     return
-                yield f"data: {json.dumps({'text': '⚠️ No matching local grounding concept was found in Pure OKF mode.', 'okf_match': False})}\n\n"
+                fallback_msg = "I don't have any grounding documents for that. Try uploading a file, pasting a URL, or asking about adk/okf."
+                yield f"data: {json.dumps({'text': fallback_msg, 'okf_match': False})}\n\n"
                 return
         
         if is_grounded:
