@@ -73,6 +73,12 @@ class OKFEngine:
                         "description": frontmatter.get("description", ""),
                         "resource": frontmatter.get("resource", ""),
                         "timestamp": frontmatter.get("timestamp", ""),
+                        # OKF v0.2 trust signals (all opt-in)
+                        "generated": frontmatter.get("generated"),
+                        "verified": frontmatter.get("verified"),
+                        "status": frontmatter.get("status"),
+                        "stale_after": frontmatter.get("stale_after"),
+                        "sources": frontmatter.get("sources"),
                         "content": body
                     }
                     self.concepts.append(concept)
