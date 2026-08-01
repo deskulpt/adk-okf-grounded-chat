@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json/2024-04-01.json",
+  "buildCommand": "cd backend && pip install -r requirements.txt -t /vercel/python && cd ..",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    }
+  ],
+  "env": {
+    "OKF_DIR": "/tmp/okf_knowledge"
+  }
+}

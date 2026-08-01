@@ -2,8 +2,8 @@ import os
 import re
 import yaml
 
-# Resolve path to okf_knowledge/ directory (located at project root)
-OKF_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "okf_knowledge"))
+# Resolve path to okf_knowledge/ directory (project root by default, /tmp in read-only serverless)
+OKF_DIR = os.environ.get("OKF_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "okf_knowledge")))
 
 class OKFEngine:
     def __init__(self, directory=OKF_DIR):

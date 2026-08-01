@@ -12,7 +12,7 @@ from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactServ
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.apps import App
 
-from okf_engine import OKFEngine
+from okf_engine import OKFEngine, OKF_DIR
 import shared
 
 app = FastAPI(title="ADK OKF Agent Backend")
@@ -27,7 +27,9 @@ app.add_middleware(
 )
 
 # Initialize OKF Engine and services
-okf_engine = OKFEngine()
+# Ensure okf_knowledge exists at runtime (works on read-only serverless with OKF_DIR=/tmp/...)
+os.makedirs(OKF_DIR, exist_ok=True)
+okf_engine = OKFEngine(OKF_DIR)
 session_service = InMemorySessionService()
 artifact_service = InMemoryArtifactService()
 memory_service = InMemoryMemoryService()
