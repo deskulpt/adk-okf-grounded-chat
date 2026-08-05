@@ -91,7 +91,7 @@ class OKFEngine:
             return None
             
         for concept in self.concepts:
-            if concept.get("type") in ("persona", "instruction"):
+            if concept.get("type") in ("persona", "instruction", "common"):
                 continue
             # Tokenize ID, title, and tags
             id_parts = set(re.split(r'[/_-]', concept['id'].lower())) | {concept['id'].lower()}
@@ -126,7 +126,7 @@ class OKFEngine:
 
         scored = []
         for concept in self.concepts:
-            if concept.get("type") in ("persona", "instruction"):
+            if concept.get("type") in ("persona", "instruction", "common"):
                 continue
             id_parts = set(re.split(r'[/_-]', concept['id'].lower())) | {concept['id'].lower()}
             title_words = set(re.findall(r'[a-zA-Z0-9]+', concept['title'].lower()))

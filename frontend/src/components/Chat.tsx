@@ -332,8 +332,8 @@ export const Chat: React.FC = () => {
                   // the Gemini/OpenAI native <reasoning> too). Unterminated tag stays in
                   // rawText so the next chunk re-enters this branch; its content is held in
                   // rawThinking. Models that emit no tag → nothing matches → full text = answer.
-                  const openRe = /<think(?:ing)?>|<reasoning>/i;
-                  const closeRe = /<\/think(?:ing)?>|<\/reasoning>/i;
+                  const openRe = /<(?:redacted_)?think(?:ing)?>|<reasoning>/i;
+                  const closeRe = /<\/(?:redacted_)?think(?:ing)?>|<\/reasoning>/i;
                   const openMatch = openRe.exec(rawText);
                   const closeMatch = closeRe.exec(rawText);
                   if (openMatch && (!closeMatch || openMatch.index < closeMatch.index)) {

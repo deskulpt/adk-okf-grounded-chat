@@ -1,3 +1,9 @@
+---
+type: "common"
+title: "Common Knowledge"
+tags: ["common", "greetings", "grammar", "help", "small-talk"]
+description: "Offline common-knowledge fallback for greetings, grammar, and help topics."
+---
 ## Greetings
 
 Hi there! I'm your local grounding assistant. Hello! How can I help you today? Hey — good to see you. Thanks for reaching out; thank you for the message. You're welcome! Glad I could help.

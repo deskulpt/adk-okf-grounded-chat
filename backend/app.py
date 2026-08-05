@@ -2,6 +2,7 @@ import json
 import asyncio
 import os
 import re
+import tempfile
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,7 +62,7 @@ def get_concepts():
     # Strip full file path for client privacy before sending
     safe_concepts = []
     for c in okf_engine.concepts:
-        if c.get("type") in ("persona", "instruction"):
+        if c.get("type") in ("persona", "instruction", "common"):
             continue
         safe_concepts.append({
             "id": c["id"],
@@ -109,8 +110,7 @@ async def update_concept(concept_id: str, request: Request):
         return {"updated": concept_id}
     except Exception as e:
         return {"error": f"Failed to save: {e}"}
-import tempfile
-import re
+
 from markitdown import MarkItDown
 
 markitdown = MarkItDown()
@@ -346,7 +346,7 @@ def get_base_persona_instructions(name: str, tone: str, behaviors: str):
 
 [RESPONSE FORMAT]:
 - First write your brief reasoning or analysis wrapped in `<think>...</think>` tags.
-- Immediately after the closing `</think:6124c78e>` tag, write only your final answer to the user.
+- Immediately after the closing `</think>` tag, write only your final answer to the user.
 - Do not restate these formatting rules inside your reply.
 """
 
@@ -501,13 +501,12 @@ async def chat_endpoint(request: Request):
     okf_engine.load_concepts()
     
     # Match multiple concepts
-    import re
     matched_concepts = []
     query_words = set(re.findall(r'[a-zA-Z0-9/_-]+', user_query.lower()))
     
     # 1. Match local client-uploaded concepts
     for c in local_concepts:
-        if c.get("type") in ("persona", "instruction"):
+        if c.get("type") in ("persona", "instruction", "common"):
             continue
         id_parts = set(re.split(r'[/_-]', c.get('id', '').lower())) | {c.get('id', '').lower()}
         title_words = set(re.findall(r'[a-zA-Z0-9]+', c.get('title', '').lower()))
@@ -519,7 +518,7 @@ async def chat_endpoint(request: Request):
     system_matches = okf_engine.match_concepts(user_query) if use_system_grounding else []
     existing_ids = {c['id'] for c in matched_concepts}
     for c in system_matches:
-        if c.get("type") in ("persona", "instruction"):
+        if c.get("type") in ("persona", "instruction", "common"):
             continue
         if c['id'] not in existing_ids:
             matched_concepts.append(c)
@@ -528,7 +527,7 @@ async def chat_endpoint(request: Request):
     query_lower = user_query.lower()
     if any(w in query_lower for w in ["all files", "uploaded files", "compare", "connections", "summarize everything", "everything uploaded", "all documents"]):
         for c in local_concepts:
-            if c.get("type") in ("persona", "instruction"):
+            if c.get("type") in ("persona", "instruction", "common"):
                 continue
             if c['id'] not in existing_ids:
                 matched_concepts.append(c)
@@ -604,7 +603,7 @@ async def chat_endpoint(request: Request):
 
         base_instruction = get_base_persona_instructions(agent_name, agent_tone, agent_behaviors)
         if is_grounded:
-            non_persona_matches = [c for c in matched_concepts if c.get("type") not in ("persona", "instruction")]
+            non_persona_matches = [c for c in matched_concepts if c.get("type") not in ("persona", "instruction", "common")]
             if non_persona_matches:
                 grounding_context_parts = []
                 for c in non_persona_matches:
